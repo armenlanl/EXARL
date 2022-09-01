@@ -4,6 +4,7 @@
     "epsilon_decay": 0.999,
     "gamma": 0.99,
     "tau": 0.005,
+    "horizon":1,
     "batch_size": 64,
     "priority_scale": 0.0,
     "buffer_capacity": 50000,

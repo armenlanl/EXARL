@@ -301,11 +301,26 @@ class DDPG(exarl.ExaAgent):
         logger().info('batch_indices:{}'.format(batch_indices))
         state_batch = tf.convert_to_tensor(self.state_buffer[batch_indices])
         action_batch = tf.convert_to_tensor(self.action_buffer[batch_indices])
-        reward_batch = tf.convert_to_tensor(self.reward_buffer[batch_indices])
-        reward_batch = tf.cast(reward_batch, dtype=tf.float32)
-        next_state_batch = tf.convert_to_tensor(self.next_state_buffer[batch_indices])
 
-        yield state_batch, action_batch, reward_batch, next_state_batch
+        reward_batch   = []
+        next_state_ind = []
+        done_batch     = []
+        for b_start in batch_indices:
+            b_end     = np.min([record_range, b_start + self.horizon - 1])
+            done_ind  = np.where(self.done_buffer[b_start:b_end])[0]
+            b_end     = b_end if len(done_ind) == 0 else b_start + done_ind[0]
+            reward_batch.append( np.sum(self._reward_buffer[b_start:b_end] * self._gamma**np.arange(b_end - b_start + 1)) )
+            next_state_ind.append( b_end + 1 if b_end != record_range else record_range)
+            done_batch.append( 0 if len(done_ind) == 0 else 1)
+        reward_batch     = tf.convert_to_tensor(reward_batch)
+        reward_batch     = tf.cast(reward_batch, dtype=tf.float32)
+        next_state_batch = tf.convert_to_tensor(self.state_buffer[next_state_ind])
+        done_batch       = tf.convert_to_tensor(done_batch)
+
+        # reward_batch = tf.convert_to_tensor(self.reward_buffer[batch_indices])
+        # next_state_batch = tf.convert_to_tensor(self.next_state_buffer[batch_indices])
+
+        yield state_batch, action_batch, reward_batch, next_state_batch, done_batch
 
     @introspectTrace()
     def train(self, batch):

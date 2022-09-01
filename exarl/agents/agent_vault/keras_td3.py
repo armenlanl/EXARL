@@ -52,21 +52,25 @@ class KerasTD3(exarl.ExaAgent):
         print('upper_bound: ', self.upper_bound)
         print('lower_bound: ', self.lower_bound)
 
+        # Used to update target networks
+        self.tau = ExaGlobals.lookup_params('tau')
+        self.gamma = ExaGlobals.lookup_params('gamma')
+
         # Buffer
         self.buffer_counter = 0
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
         self.batch_size = ExaGlobals.lookup_params('batch_size')
-        self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
+        self.horizon = ExaGlobals.lookup_params('horizon')
+        if self.horizon == 1:
+            self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
+        else:
+            self.memory = nStepBuffer(self.buffer_capacity, self.num_states, self.num_actions, self.horizon, self.gamma)
         # self.state_buffer = np.zeros((self.buffer_capacity, self.num_states))
         # self.action_buffer = np.zeros((self.buffer_capacity, self.num_actions))
         # self.reward_buffer = np.zeros((self.buffer_capacity, 1))
         # self.next_state_buffer = np.zeros((self.buffer_capacity, self.num_states))
         # self.done_buffer = np.zeros((self.buffer_capacity, 1))
         self.per_buffer = np.ones((self.buffer_capacity, 1))
-
-        # Used to update target networks
-        self.tau = ExaGlobals.lookup_params('tau')
-        self.gamma = ExaGlobals.lookup_params('gamma')
 
         # Setup Optimizers
         critic_lr = ExaGlobals.lookup_params('critic_lr')
