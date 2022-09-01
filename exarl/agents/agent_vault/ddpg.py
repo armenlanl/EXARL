@@ -65,6 +65,8 @@ class DDPG(exarl.ExaAgent):
 
         self.gamma = ExaGlobals.lookup_params('gamma')
         self.tau = ExaGlobals.lookup_params('tau')
+        self.horizon = ExaGlobals.lookup_params('horizon')
+
 
         # model definitions
         self.actor_dense = ExaGlobals.lookup_params('actor_dense')

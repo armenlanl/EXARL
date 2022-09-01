@@ -78,6 +78,7 @@ class TD3(exarl.ExaAgent):
         self.epsilon = ExaGlobals.lookup_params('epsilon')
         self.epsilon_min = ExaGlobals.lookup_params('epsilon_min')
         self.epsilon_decay = ExaGlobals.lookup_params('epsilon_decay')
+        self.horizon = ExaGlobals.lookup_params('horizon')
 
         # Experience data
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
