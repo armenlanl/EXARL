@@ -6,6 +6,8 @@ except:
 
 if env == 'ExaCartPoleStatic-v0':
     from exarl.envs.env_vault.ExaCartpoleStatic import ExaCartpoleStatic
+if env == 'ExaMountainCarContinuous-v0':
+    from exarl.envs.env_vault.ExaMountainCarContinuous import ExaMountainCarContinuous
 elif env == 'ExaCH-v0':
     from exarl.envs.env_vault.ExaCH import CahnHilliardEnv
 elif env == 'ExaCovid-v0':
@@ -32,3 +34,11 @@ elif env == 'ExaExaaltVE-v0':
     from exarl.envs.env_vault.ExaExaaltVE import ExaExaaltVE
 elif env == 'ExaExaaltGraph-v0':
     from exarl.envs.env_vault.ExaExaaltGraph import ExaExaaltGraph
+elif env == 'ExaExaaltGraph-v1':
+    from exarl.envs.env_vault.ExaExaaltGraphRL import ExaExaaltGraphRL
+elif env == 'ExaExaaltGraph-v2':
+    from exarl.envs.env_vault.ExaExaaltGraphRLTask import ExaExaaltGraphRLTask
+elif env == 'ExaExaaltGraph-v3':
+    from exarl.envs.env_vault.ExaExaaltGraphRLSpace import ExaExaaltGraphRLSpace
+elif env == 'ExaPendulum-v0':
+    from exarl.envs.env_vault.ExaPendulum import ExaPendulum

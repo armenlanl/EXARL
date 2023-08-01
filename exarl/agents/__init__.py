@@ -35,6 +35,21 @@ elif agent == 'GraphTD3-v0':
         id=agent,
         entry_point='exarl.agents.agent_vault:KerasGraphTD3'
     )
+elif agent == 'GraphTD3-v1':
+    register(
+        id=agent,
+        entry_point='exarl.agents.agent_vault:KerasGraphTD3RL'
+    )
+elif agent == 'GraphTD3-v2':
+    register(
+        id=agent,
+        entry_point='exarl.agents.agent_vault:KerasGraphTD3RLTask'
+    )
+elif agent == 'GraphTD3-v3':
+    register(
+        id=agent,
+        entry_point='exarl.agents.agent_vault:KerasGraphTD3RLSpace'
+    )
 elif agent == 'PARS-v0':
     register(
         id=agent,

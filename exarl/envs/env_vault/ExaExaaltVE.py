@@ -96,7 +96,7 @@ class ExaExaaltVE(gym.Env):
         number_of_states = 100000
 
         self.n_states  = number_of_states
-        self.nWorkers  = 500
+        self.nWorkers  = 5
         self.num_done  = 0
         self.WCT       = 0
         self.RUN_TIME  = 100 #10000

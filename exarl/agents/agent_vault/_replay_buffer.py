@@ -20,11 +20,15 @@ class ReplayBuffer(Replay):
         self._memory_counter = 0
         # Added the if statement to allow for multidimensional input
         if type(input_size) == type((1,)):
-            self._state_buffer      = np.zeros(((max_size,) + input_size))
-            self._next_state_buffer = np.zeros(((max_size,) + input_size))
+            # self._state_buffer      = [np.zeros(((max_size,) + input_size))]
+            # self._next_state_buffer = np.zeros(((max_size,) + input_size))
+            self._state_buffer      = []
+            self._next_state_buffer = []
         else:
-            self._state_buffer      = np.zeros((max_size, input_size))
-            self._next_state_buffer = np.zeros((max_size, input_size))
+            # self._state_buffer      = np.zeros((max_size, input_size))
+            # self._next_state_buffer = np.zeros((max_size, input_size))
+            self._state_buffer      = []
+            self._next_state_buffer = []
         self._action_buffer = np.zeros((max_size, n_actions))
         self._reward_buffer = np.zeros((max_size, 1))
         self._done_buffer = np.zeros((max_size, 1))
@@ -39,10 +43,16 @@ class ReplayBuffer(Replay):
             next_state (array): array of next state after taking action
             done (bool): indicates episode completion
         """
-        self._state_buffer[self._memory_counter] = state
+
+        # self._state_buffer[self._memory_counter] = state
+        self._state_buffer.append(state)
+        
         self._action_buffer[self._memory_counter] = action[0]
         self._reward_buffer[self._memory_counter] = reward
-        self._next_state_buffer[self._memory_counter] = next_state
+        
+        # self._next_state_buffer[self._memory_counter] = next_state
+        self._next_state_buffer.append(next_state)
+        
         self._done_buffer[self._memory_counter] = int(done)
         self._memory_counter = (self._memory_counter + 1) % self._memory_size
         if not self.is_full:
@@ -66,10 +76,10 @@ class ReplayBuffer(Replay):
 
         # Randomly sample indices
         batch_indices = np.random.choice(record_range, batch_size)
-        state_batch = self._state_buffer[batch_indices]
+        state_batch = np.array(self._state_buffer, dtype=object)[batch_indices]
         action_batch = self._action_buffer[batch_indices]
         reward_batch = self._reward_buffer[batch_indices]
-        next_state_batch = self._next_state_buffer[batch_indices]
+        next_state_batch = np.array(self._next_state_buffer, dtype=object)[batch_indices]
         done_batch = self._done_buffer[batch_indices]
 
         return state_batch, action_batch, reward_batch, next_state_batch, done_batch
@@ -79,10 +89,16 @@ class ReplayBuffer(Replay):
         """
         self._memory_counter = 0
         self._mem_length = 0
-        self._state_buffer.fill(0)
+
+        # self._state_buffer.fill(0)
+        self._state_buffer = []
+
         self._action_buffer.fill(0)
         self._reward_buffer.fill(0)
-        self._next_state_buffer.fill(0)
+        
+        # self._next_state_buffer.fill(0)
+        self._next_state_buffer = []
+
         self._done_buffer.fill(0)
 
 

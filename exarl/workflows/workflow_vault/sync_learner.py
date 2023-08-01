@@ -447,7 +447,7 @@ class SYNC(exarl.ExaWorkflow):
             self.total_reward = 0
             self.steps = 0
             self.done = False
-            self.current_state = exalearner.env.reset()
+            self.current_state, _ = exalearner.env.reset()
 
     def init_learner(self, exalearner):
         """
@@ -762,6 +762,7 @@ class SYNC(exarl.ExaWorkflow):
         self.init_learner(exalearner)
         if ExaComm.is_agent():
             while self.alive and self.done_episode < nepisodes:
+                print("EPISODE NUMBER: ", self.done_episode)
                 self.actor(exalearner, nepisodes)
                 do_convergence_check = self.learner(exalearner, nepisodes, 0)
                 if do_convergence_check:

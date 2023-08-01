@@ -220,7 +220,7 @@ class ExaExaaltGraph(gym.Env):
         """
 
         """
-        stateDepth       = 10 #segments
+        stateDepth       = 50 #segments
         number_of_states = 100000
 
         self.n_states  = number_of_states
@@ -275,6 +275,7 @@ class ExaExaaltGraph(gym.Env):
         # self.action_space      = gym.spaces.Box(np.zeros(self.n_states), np.ones(self.n_states))
         # self.observation_space = gym.spaces.Box(np.zeros(self.n_states), np.ones(self.n_states))
 
+        # Action space is going to change to represent the number actions queued for trajectories (See the VE algorithm nWorkers tasklist for size model)
         self.action_space      = gym.spaces.Box(np.zeros(6), np.array([100.,100.,100.,100.,100.,100.]))
         self.observation_space = gym.spaces.Box(low=np.array([0.,0.]),high=np.array([np.inf,np.inf]))
         self.observation_space = gym.spaces.Box(low=0, high=np.inf, shape=(graph_size, graph_size))
@@ -364,18 +365,24 @@ class ExaExaaltGraph(gym.Env):
         # launchStates = np.random.choice(range(self.n_states), size=self.nWorkers)#, p=action)
         self.crankModel()
         print(action)
+        # Replace the task list with what the RL algorithm outputs for it's actions
+        # This is where the VE algorithm is making the decisions of the actions to take
+        # The task list is a list of indices that are length of nWorkers that represent the desired trajectories to be calculated
         taskList = VE(self.traj, self.knownStates, self.database, self.nWorkers, action)
         for i in range(self.nWorkers):
             workerID   = i
             buildState = taskList[i] # launchStates[i]
+            # End state is the determined trajectory of the starting state set in the task list
+            # The probability of transition is based of the map and is not random but set specifically at the beginning
             endState   = np.random.choice(list(self.Map[buildState].keys()),p=list(self.Map[buildState].values()))
 
             self.knownStates[buildState].update(endState)
-            if buildState == endState:
-                self.selfTrans[0].update(0)
-            else:
-                self.selfTrans[0].update(1)
+            # if buildState == endState:
+            #     self.selfTrans[0].update(0)
+            # else:
+            #     self.selfTrans[0].update(1)
             self.database[buildState].append(endState)
+            # New end state that has not been transitioned to before needs to be addede to knownStates along with added into a database entry
             if (endState not in self.knownStates.keys()):
                 self.knownStates[endState]=StateStatistics(endState, self.Map)
                 self.database[endState] = []

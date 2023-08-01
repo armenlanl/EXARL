@@ -18,6 +18,18 @@ elif env == 'ExaCartPoleStatic-v0':
         entry_point='exarl.envs.env_vault:ExaCartpoleStatic'
     )
 
+elif env == 'ExaMountainCarContinuous-v0':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaMountainCarContinuous'
+    )
+
+elif env == 'ExaPendulum-v0':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaPendulum'
+    )
+
 elif env == 'ExaCovid-v0':
     register(
         id=env,
@@ -78,6 +90,24 @@ elif env == 'ExaExaaltGraph-v0':
         entry_point='exarl.envs.env_vault:ExaExaaltGraph'
     )
 
+elif env == 'ExaExaaltGraph-v1':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaExaaltGraphRL'
+    )
+
+elif env == 'ExaExaaltGraph-v2':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaExaaltGraphRLTask'
+    )
+
+elif env == 'ExaExaaltGraph-v3':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaExaaltGraphRLSpace'
+    )
+   
 elif env == 'Hadrec-v0':
     register(
         id=env,

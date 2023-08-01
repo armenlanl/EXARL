@@ -112,6 +112,7 @@ class KerasGraphTD3(exarl.ExaAgent):
 
     @tf.function
     def train_critic(self, states, actions, rewards, next_states):
+        print(states.shape
         next_actions = self.target_actor(next_states, training=False)
         # Add a little noise
         noise = np.random.normal(0, 0.2, self.num_actions)
@@ -245,12 +246,17 @@ class KerasGraphTD3(exarl.ExaAgent):
         """ Method used to provide the next action using the target model """
         tf_state = tf.expand_dims(tf.convert_to_tensor(state), 0)
         sampled_actions = tf.squeeze(self.actor_model(tf_state))
+        print("Sampled action output from the actor: ", sampled_actions)
+
         noise = np.random.normal(0, 0.1, self.num_actions)
         sampled_actions = sampled_actions.numpy() * (1 + noise)
         policy_type = 1
 
+        print("Sampled noisey action output from the actor: ", sampled_actions)
+
         # We make sure action is within bounds
         legal_action = np.clip(sampled_actions, self.lower_bound, self.upper_bound)
+        print("Clipped legal action: ", legal_action)
         # tf.print("legal_action", legal_action.shape)
 
         # return [np.squeeze(legal_action)], [np.squeeze(noise)]
