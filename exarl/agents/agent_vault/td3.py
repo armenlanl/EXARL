@@ -28,7 +28,7 @@ from exarl.utils.globals import ExaGlobals
 from exarl.utils.OUActionNoise import OUActionNoise
 from exarl.utils.OUActionNoise import OUActionNoise2
 from exarl.utils.memory_type import MEMORY_TYPE
-from exarl.agents.agent_vault._replay_buffer import ReplayBuffer, HindsightExperienceReplayMemory, PrioritedReplayBuffer
+from exarl.agents.agent_vault._replay_buffer import ReplayBuffer
 logger = ExaGlobals.setup_logger(__name__)
 
 
@@ -85,10 +85,10 @@ class TD3(exarl.ExaAgent):
 
         if self.replay_buffer_type == MEMORY_TYPE.UNIFORM_REPLAY:
             self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
-        elif self.replay_buffer_type == MEMORY_TYPE.PRIORITY_REPLAY:
-            self.memory = PrioritedReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions, self.batch_size)
-        elif self.replay_buffer_type == MEMORY_TYPE.HINDSIGHT_REPLAY:  # TODO: Double check if the environment has goal state
-            self.memory = HindsightExperienceReplayMemory(self.buffer_capacity, self.num_states, self.num_actions)
+        # elif self.replay_buffer_type == MEMORY_TYPE.PRIORITY_REPLAY:
+        #     self.memory = PrioritedReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions, self.batch_size)
+        # elif self.replay_buffer_type == MEMORY_TYPE.HINDSIGHT_REPLAY:  # TODO: Double check if the environment has goal state
+        #     self.memory = HindsightExperienceReplayMemory(self.buffer_capacity, self.num_states, self.num_actions)
         else:
             print("Unrecognized replay buffer please specify 'uniform, priority or hindsight', using default uniform sampling")
             raise ValueError("Unrecognized Memory type {}".format(self.replay_buffer_type))

@@ -29,9 +29,11 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.initializers import RandomUniform
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import layers
 
 import exarl
 from exarl.utils.globals import ExaGlobals
+from exarl.utils.OUActionNoise import OUActionNoise
 from exarl.agents.agent_vault._replay_buffer import ReplayBuffer
 logger = ExaGlobals.setup_logger(__name__)
 
@@ -44,26 +46,44 @@ class KerasTD3(exarl.ExaAgent):
         # Get env info
         super().__init__(**kwargs)
         self.env = env
-
         self.num_states = env.observation_space.shape[0]
-        print("num states: ", self.num_states)
         self.num_actions = env.action_space.shape[0]
         self.upper_bound = env.action_space.high
         self.lower_bound = env.action_space.low
-        print('upper_bound: ', self.upper_bound)
-        print('lower_bound: ', self.lower_bound)
+        # print("num states: ", self.num_states)
+        # print('upper_bound: ', self.upper_bound)
+        # print('lower_bound: ', self.lower_bound)
 
         # Buffer
         self.buffer_counter = 0
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
         self.batch_size = ExaGlobals.lookup_params('batch_size')
         self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
+        self.per_buffer = np.ones((self.buffer_capacity, 1))
         # self.state_buffer = np.zeros((self.buffer_capacity, self.num_states))
         # self.action_buffer = np.zeros((self.buffer_capacity, self.num_actions))
         # self.reward_buffer = np.zeros((self.buffer_capacity, 1))
         # self.next_state_buffer = np.zeros((self.buffer_capacity, self.num_states))
         # self.done_buffer = np.zeros((self.buffer_capacity, 1))
-        self.per_buffer = np.ones((self.buffer_capacity, 1))
+
+        # Model Definitions
+        self.actor_dense = ExaGlobals.lookup_params('actor_dense')
+        self.actor_dense_act = ExaGlobals.lookup_params('actor_dense_act')
+        self.actor_out_act = ExaGlobals.lookup_params('actor_out_act')
+        self.actor_optimizer = ExaGlobals.lookup_params('actor_optimizer')
+        self.critic_state_dense = ExaGlobals.lookup_params('critic_state_dense')
+        self.critic_state_dense_act = ExaGlobals.lookup_params('critic_state_dense_act')
+        self.critic_action_dense = ExaGlobals.lookup_params('critic_action_dense')
+        self.critic_action_dense_act = ExaGlobals.lookup_params('critic_action_dense_act')
+        self.critic_concat_dense = ExaGlobals.lookup_params('critic_concat_dense')
+        self.critic_concat_dense_act = ExaGlobals.lookup_params('critic_concat_dense_act')
+        self.critic_out_act = ExaGlobals.lookup_params('critic_out_act')
+        self.critic_optimizer = ExaGlobals.lookup_params('critic_optimizer')
+
+        # Ornstein-Uhlenbeck process
+        std_dev = 0.2
+        ave_bound = np.zeros(1)
+        self.ou_noise = OUActionNoise(mean=ave_bound, std_deviation=float(std_dev) * np.ones(1))
 
         # Used to update target networks
         self.tau = ExaGlobals.lookup_params('tau')
@@ -97,7 +117,8 @@ class KerasTD3(exarl.ExaAgent):
         # update counting
         self.ntrain_calls = 0
         self.actor_update_freq = 2
-        self.critic_update_freq = 2
+        self.target_critic_update_freq = 2
+        self.critic_update_freq = 1
 
         # Not used by agent but required by the learner class
         self.epsilon = ExaGlobals.lookup_params('epsilon')
@@ -113,13 +134,13 @@ class KerasTD3(exarl.ExaAgent):
 
     @tf.function
     def train_critic(self, states, actions, rewards, next_states):
-        next_actions = self.target_actor(next_states, training=False)
+        next_actions = self.target_actor(next_states, training=True)
         # Add a little noise
-        noise = np.random.normal(0, 0.2, self.num_actions)
-        noise = np.clip(noise, -0.5, 0.5)
-        next_actions = next_actions * (1 + noise)
-        new_q1 = self.target_critic1([next_states, next_actions], training=False)
-        new_q2 = self.target_critic2([next_states, next_actions], training=False)
+        # noise = np.random.normal(0, 0.2, self.num_actions)
+        # noise = np.clip(noise, -0.5, 0.5)
+        next_actions = next_actions + self.ou_noise()
+        new_q1 = self.target_critic1([next_states, next_actions], training=True)
+        new_q2 = self.target_critic2([next_states, next_actions], training=True)
         new_q = tf.math.minimum(new_q1, new_q2)
         # Bellman equation for the q value
         q_targets = rewards + self.gamma * new_q
@@ -151,67 +172,77 @@ class KerasTD3(exarl.ExaAgent):
         self.actor_optimizer.apply_gradients(zip(gradient, self.actor_model.trainable_variables))
 
     def get_critic(self):
-        # State as input
-        state_input = tf.keras.layers.Input(shape=(self.num_states))
-        state_out = tf.keras.layers.BatchNormalization()(state_input)
+        """Define critic network
 
-        state_out = tf.keras.layers.Dense(16,activation = 'relu')(state_out)
-        state_out = tf.keras.layers.Dense(32,activation = 'relu')(state_out)
-        
-        # state_out = tf.keras.layers.Dense(16 * self.num_states, activation="relu")(state_input)
-        # state_out = tf.keras.layers.Dense(32 * self.num_states, activation="relu")(state_out)
+        Returns:
+            model: critic network
+        """
+        # State as input
+        state_input = layers.Input(shape=self.num_states)
+        # first layer takes inputs
+        state_out = layers.Dense(self.critic_state_dense[0],
+                                    activation=self.critic_state_dense_act)(state_input)
+        # loop over remaining layers
+        for i in range(1, len(self.critic_state_dense)):
+            state_out = layers.Dense(self.critic_state_dense[i],
+                                        activation=self.critic_state_dense_act)(state_out)
 
         # Action as input
-        action_input = tf.keras.layers.Input(shape=(self.num_actions))
-        action_out = tf.keras.layers.BatchNormalization()(action_input)
-        action_out = tf.keras.layers.Dense(32, activation="relu")(action_out)
+        action_input = layers.Input(shape=self.num_actions)
 
-        # Both are passed through separate layer before concatenating
-        concat = tf.keras.layers.Concatenate()([state_out, action_out])
+        # first layer takes inputs
+        action_out = layers.Dense(self.critic_action_dense[0],
+                                    activation=self.critic_action_dense_act)(action_input)
+        # loop over remaining layers
+        for i in range(1, len(self.critic_action_dense)):
+            action_out = layers.Dense(self.critic_action_dense[i],
+                                        activation=self.critic_action_dense_act)(action_out)
 
-        out = tf.keras.layers.Dense(256, activation="relu")(concat)
-        out = tf.keras.layers.Dense(256, activation="relu")(concat)
-        outputs = tf.keras.layers.Dense(1)(out)
+        # Both are passed through seperate layer before concatenating
+        concat = layers.Concatenate()([state_out, action_out])
+
+        # assumes at least 2 post-concat layers
+        # first layer takes concat layer as input
+        concat_out = layers.Dense(self.critic_concat_dense[0],
+                                    activation=self.critic_concat_dense_act)(concat)
+        # loop over remaining inner layers
+        for i in range(1, len(self.critic_concat_dense) - 1):
+            concat_out = layers.Dense(self.critic_concat_dense[i],
+                                        activation=self.critic_concat_dense_act)(concat_out)
+
+        # last layer has different activation
+        concat_out = layers.Dense(self.critic_concat_dense[-1], activation=self.critic_out_act,
+                                    kernel_initializer=tf.random_uniform_initializer())(concat_out)
+        outputs = layers.Dense(1)(concat_out)
 
         # Outputs single value for give state-action
         model = tf.keras.Model([state_input, action_input], outputs)
-        model.summary()
-        return model      
+        # model.summary()
+
+        return model  
 
     def get_actor(self):
+        """Define actor network
 
-        last_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
-
-        # MLP
-        inputs = tf.keras.layers.Input(shape=(self.num_states))
-        out = tf.keras.layers.BatchNormalization()(inputs)
-        out = tf.keras.layers.Dense(256, activation="relu")(out)
-        out = tf.keras.layers.Dense(256, activation="relu")(out)
-        # out = tf.keras.layers.Dense(128, activation="relu")(out)
-        #
-        # out = tf.keras.layers.Dense(self.hidden_size,
-        #                             kernel_initializer=RandomUniform(-self.layer_std, +self.layer_std),
-        #                             bias_initializer=RandomUniform(-self.layer_std, +self.layer_std))(inputs)
-        # out = tf.keras.layers.BatchNormalization()(out)
-        # out = tf.keras.layers.Activation(tf.nn.leaky_relu)(out)
-        # #
-        # out = tf.keras.layers.Dense(self.hidden_size,
-        #                             kernel_initializer=RandomUniform(-self.layer_std, +self.layer_std),
-        #                             bias_initializer=RandomUniform(-self.layer_std, +self.layer_std))(out)
-        # out = tf.keras.layers.BatchNormalization()(out)
-        # out = tf.keras.layers.Activation(tf.nn.leaky_relu)(out)
-        #
-        outputs = tf.keras.layers.Dense(self.num_actions, activation="tanh",
-                                        kernel_initializer=last_init)(out)
-
-        # Rescale for tanh [-1,1]
-        # outputs = tf.keras.layers.Dense(128, activation="tanh")(out)
-
+        Returns:
+            model: actor model
+        """
+        # State as input
+        inputs = layers.Input(shape=(self.num_states,))
+        # first layer takes inputs
+        out = layers.Dense(self.actor_dense[0], activation=self.actor_dense_act)(inputs)
+        # loop over remaining layers
+        for i in range(1, len(self.actor_dense)):
+            out = layers.Dense(self.actor_dense[i], activation=self.actor_dense_act)(out)
+        # output layer has dimension actions, separate activation setting
+        out = layers.Dense(self.num_actions, activation=self.actor_out_act,
+                            kernel_initializer=tf.random_uniform_initializer())(out)
+        # Scale to the env problem
         outputs = tf.keras.layers.Lambda(
-            lambda x: ((x + 1.0) * (self.upper_bound - self.lower_bound)) / 2.0 + self.lower_bound)(outputs)
-
+            lambda x: ((x + 1.0) * (self.upper_bound - self.lower_bound)) / 2.0 + self.lower_bound)(out)
         model = tf.keras.Model(inputs, outputs)
         model.summary()
+
         return model
 
     @tf.function
@@ -223,6 +254,9 @@ class KerasTD3(exarl.ExaAgent):
     #     self.train_critic(state_batch, action_batch, reward_batch, next_state_batch)
     #     self.train_actor(state_batch)
 
+    def update_gradient(self, state_batch, action_batch, reward_batch, next_state_batch):
+        return False
+
     def update(self, state_batch, action_batch, reward_batch, next_state_batch):
         # print("SHAPE OF state_batch: ", state_batch.shape)
         # print("SHAPE OF state_batch[0]: ", state_batch[0,0].shape)
@@ -230,28 +264,30 @@ class KerasTD3(exarl.ExaAgent):
         # print("SHAPE OF next_state_batch: ", next_state_batch.shape)
         # print("Single batch: ", state_batch[0,1].shape)
         
-        tf_state_batch = np.zeros(shape=(len(state_batch[:,0]),self.num_states))
-        tf_next_state_batch = np.zeros(shape=(len(next_state_batch[:,0]),self.num_states))
+        # tf_state_batch = np.zeros(shape=(len(state_batch[:,0]),self.num_states))
+        # tf_next_state_batch = np.zeros(shape=(len(next_state_batch[:,0]),self.num_states))
 
-        for i in range(len(state_batch[:,0])):
-            tf_state_batch[i] = state_batch[i,0]
-            tf_next_state_batch[i] = tf_next_state_batch[i,0]
+        # for i in range(len(state_batch[:,0])):
+        #     tf_state_batch[i] = state_batch[i,0]
+        #     tf_next_state_batch[i] = tf_next_state_batch[i,0]
 
-        tf_state_batch = tf.convert_to_tensor(tf_state_batch, dtype=tf.float32)
-        tf_next_state_batch = tf.convert_to_tensor(tf_next_state_batch, dtype=tf.float32)
-
-        self.train_critic(tf_state_batch, action_batch, reward_batch, tf_next_state_batch)
-        self.train_actor(tf_state_batch)
+        # tf_state_batch = tf.convert_to_tensor(tf_state_batch, dtype=tf.float32)
+        # tf_next_state_batch = tf.convert_to_tensor(tf_next_state_batch, dtype=tf.float32)
+        if self.ntrain_calls % self.actor_update_freq == 0:
+            self.train_actor(state_batch)
+        if self.ntrain_calls % self.critic_update_freq == 0:    
+            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch)
+        
 
     def _convert_to_tensor(self, state_batch, action_batch, reward_batch, next_state_batch, terminal_batch):
-        for i in range(len(state_batch[:,0])):
-            state_batch[i,0] = tf.convert_to_tensor(state_batch[i,0], dtype=tf.float32)
-        # state_batch = tf.convert_to_tensor(state_batch, dtype=tf.float32)
+        # for i in range(len(state_batch[:,0])):
+        #     state_batch[i,0] = tf.convert_to_tensor(state_batch[i,0], dtype=tf.float32)
+        state_batch = tf.convert_to_tensor(state_batch, dtype=tf.float32)
         action_batch = tf.convert_to_tensor(action_batch, dtype=tf.float32)
         reward_batch = tf.convert_to_tensor(reward_batch, dtype=tf.float32)
-        for i in range(len(next_state_batch[:,0])):
-            next_state_batch[i,0] = tf.convert_to_tensor(next_state_batch[i,0], dtype=tf.float32)
-        # next_state_batch = tf.convert_to_tensor(next_state_batch, dtype=tf.float32)
+        # for i in range(len(next_state_batch[:,0])):
+        #     next_state_batch[i,0] = tf.convert_to_tensor(next_state_batch[i,0], dtype=tf.float32)
+        next_state_batch = tf.convert_to_tensor(next_state_batch, dtype=tf.float32)
         terminal_batch = tf.convert_to_tensor(terminal_batch, dtype=tf.float32)
         return state_batch, action_batch, reward_batch, next_state_batch, terminal_batch
 
@@ -268,16 +304,19 @@ class KerasTD3(exarl.ExaAgent):
     def update_target(self):
         if self.ntrain_calls % self.actor_update_freq == 0:
             self.soft_update(self.target_actor.variables, self.actor_model.variables)
-        if self.ntrain_calls % self.critic_update_freq == 0:
+        if self.ntrain_calls % self.target_critic_update_freq == 0:
             self.soft_update(self.target_critic1.variables, self.critic_model1.variables)
             self.soft_update(self.target_critic2.variables, self.critic_model2.variables)
 
     def action(self, state):
         """ Method used to provide the next action using the target model """
         tf_state = tf.expand_dims(tf.convert_to_tensor(state), 0)
-        sampled_actions = self.actor_model(tf_state)
-        noise = np.random.normal(0, 0.1, self.num_actions)
-        sampled_actions = sampled_actions.numpy() * (1 + noise)
+        sampled_actions = tf.squeeze(self.actor_model(tf_state))
+        # noise = np.random.normal(0, 0.1, self.num_actions)
+
+        # Changed the noise
+        noise = self.ou_noise()
+        sampled_actions = sampled_actions.numpy() + noise
         policy_type = 1
 
         # We make sure action is within bounds
