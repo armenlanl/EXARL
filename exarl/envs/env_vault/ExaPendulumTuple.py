@@ -88,11 +88,9 @@ class ExaPendulumTuple(gym.Env):
     def reset(self):
         # self.env._max_episode_steps=self._max_episode_steps
         # print('Max steps: %s' % str(self._max_episode_steps))
-        test = self.env.reset()
-        print("This is what is returned on reset: ", test)
-        tuple_hold = (test[0], self.end_traj, self.mask)
-        print("This is what is returned on tuple reset: ", type(tuple_hold))
-        return tuple_hold
+        default_reset = self.env.reset()
+        state_tuple = (default_reset[0], self.end_traj, self.mask)
+        return state_tuple, {}
 
     def render(self, mode='human', close=False):
         return self.env.render()

@@ -14,6 +14,8 @@ elif agent == 'TD3-v0':
     from exarl.agents.agent_vault.td3 import TD3
 elif agent == 'TD3-v1':
     from exarl.agents.agent_vault.keras_td3 import KerasTD3
+elif agent == 'TD3-v2':
+    from exarl.agents.agent_vault.keras_td3_tuple import KerasTD3Tuple
 elif agent == 'GraphTD3-v0':
     from exarl.agents.agent_vault.keras_td3_graph import KerasGraphTD3
 elif agent == 'GraphTD3-v1':

@@ -30,6 +30,13 @@ elif env == 'ExaPendulum-v0':
         entry_point='exarl.envs.env_vault:ExaPendulum'
     )
 
+elif env == 'ExaPendulum-v1':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaPendulumTuple'
+    )
+
+
 elif env == 'ExaCovid-v0':
     register(
         id=env,

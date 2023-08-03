@@ -258,6 +258,7 @@ class KerasTD3(exarl.ExaAgent):
         return False
 
     def update(self, state_batch, action_batch, reward_batch, next_state_batch):
+        print("SHAPE OF state_batch: ", state_batch.shape)
         # print("SHAPE OF state_batch: ", state_batch.shape)
         # print("SHAPE OF state_batch[0]: ", state_batch[0,0].shape)
         # print("SHAPE OF state_batch[2]: ", type(state_batch[0,2]))
