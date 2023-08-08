@@ -456,7 +456,7 @@ class ExaExaaltGraphRLTask(gym.Env):
         reward        = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
         current_state = self.traj[-1]
 
-        next_state = [self.generate_data(), current_state, self.knownStates]
+        next_state = (self.generate_data(), current_state, self.knownStates)
         info = None
         print("Episode: ", self.WCT, " Reward: ", reward, " ", done)
         return next_state, reward, done, info
@@ -481,7 +481,8 @@ class ExaExaaltGraphRLTask(gym.Env):
         
         self.knownStates[self.INITIAL_STATE] = StateStatistics(self.INITIAL_STATE, self.Map)
 
-        return [self.generate_data(), self.traj[-1], self.knownStates] # Return new state
+        state_tuple = (self.generate_data(), self.traj[-1], self.knownStates)
+        return (state_tuple, {})
 
     def render(self):
         """ Not relevant here but left for template convenience """

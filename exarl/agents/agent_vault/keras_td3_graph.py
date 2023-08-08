@@ -112,7 +112,6 @@ class KerasGraphTD3(exarl.ExaAgent):
 
     @tf.function
     def train_critic(self, states, actions, rewards, next_states):
-        print(states.shape
         next_actions = self.target_actor(next_states, training=False)
         # Add a little noise
         noise = np.random.normal(0, 0.2, self.num_actions)

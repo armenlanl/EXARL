@@ -254,14 +254,6 @@ class KerasTD3Tuple(exarl.ExaAgent):
         return False
 
     def update(self, state_batch, action_batch, reward_batch, next_state_batch):
-
-        # tf_state_batch = np.zeros(shape=(self.batch_size,self.num_states))
-        # tf_next_state_batch = np.zeros(shape=(self.batch_size,self.num_states))
-        # for i in range(self.batch_size):
-        #     tf_state_batch[i] = tf.convert_to_tensor(state_batch[i,0], dtype=tf.float32)
-        #     tf_next_state_batch[i] = tf.convert_to_tensor(next_state_batch[i,0], dtype=tf.float32)  
-        # tf_state_batch = tf.convert_to_tensor(tf_state_batch, dtype=tf.float32)
-        # tf_next_state_batch = tf.convert_to_tensor(tf_next_state_batch, dtype=tf.float32)
         if self.ntrain_calls % self.actor_update_freq == 0:
             self.train_actor(state_batch)
         if self.ntrain_calls % self.critic_update_freq == 0:    

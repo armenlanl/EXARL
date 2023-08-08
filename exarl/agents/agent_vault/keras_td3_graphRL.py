@@ -87,7 +87,6 @@ def get_graph_adj(knownStates, state):
     # print(adj_mat)
     return adj_mat
 
-
 class KerasGraphTD3RL(exarl.ExaAgent):
 
     def __init__(self, env, is_learner, **kwargs):

@@ -24,7 +24,7 @@ import gym
 from exarl.utils.globals import ExaGlobals
 from datetime import datetime
 
-run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_5nw_5sd_1kNoS_150e_100eps_rewardchangegreed'
+run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_250nw_50sd_10kNoS_200e_100eps_PATCH_'
 
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
@@ -206,19 +206,19 @@ class StateStatistics:
 
 class ExaExaaltGraphRLSpace(gym.Env):
 
-    metadata = {"node_count": 1000}
+    metadata = {"node_count": 10000}
 
     def __init__(self,**kwargs):
         super().__init__()
         """
 
         """
-        stateDepth       = 5 #segments
-        number_of_states = 1000
+        stateDepth       = 50 #segments
+        number_of_states = 10000
 
         self.n_states  = number_of_states
         # self.nWorkers  = 500
-        self.nWorkers  = 5
+        self.nWorkers  = 250
         self.num_done  = 0
         self.WCT       = 0
         self.RUN_TIME  = 100 #10000
@@ -458,13 +458,14 @@ class ExaExaaltGraphRLSpace(gym.Env):
 
         """ Iterates the testing process forward one step """
 
-        reward        = 0.0*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + (added/self.nWorkers)
+        # reward        = 0.0*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + (added/self.nWorkers)
+        reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
         current_state = self.traj[-1]
 
         adj_mat = self.generate_data()
-        next_state = [adj_mat, current_state, self.knownStates]
+        next_state = (adj_mat, current_state, self.knownStates)
         info = None
-        print("Episode: ", self.WCT, " Reward: ", reward, " ", done)
+        print("Step: ", self.WCT, " Reward: ", reward, " ", done)
         return next_state, reward, done, info
 
     def reset(self):
@@ -487,7 +488,8 @@ class ExaExaaltGraphRLSpace(gym.Env):
         
         self.knownStates[self.INITIAL_STATE] = StateStatistics(self.INITIAL_STATE, self.Map)
         adj_mat = self.generate_data()
-        return [adj_mat, self.traj[-1], self.knownStates] # Return new state
+        state_tuple = (adj_mat, self.traj[-1], self.knownStates)
+        return state_tuple, {} # Return new state
 
     def render(self):
         """ Not relevant here but left for template convenience """
