@@ -137,23 +137,28 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         
         next_adj_mat, next_dat_mat = tf.split(next_states, num_or_size_splits=2, axis=2)
         next_actions = self.target_actor([next_adj_mat, next_dat_mat], training=False)
-
+        
+        # Add a little noise
+        noise = self.ou_noise()
+        next_actions = next_actions + noise
+        # noise = np.random.normal(0, 0.1, self.node_count)
+        # noise = np.clip(noise, -0.5, 0.5)
+        # next_actions = next_actions * (1 + noise)
+       
         #Masking the invalid actions
-        next_actions = tf.where(next_masks, next_actions, tf.zeros_like(next_actions))
-
-        #Add a little noise
-        noise = np.random.normal(0, 0.1, self.node_count)
-        noise = np.clip(noise, -0.5, 0.5)
-        next_actions = next_actions * (1 + noise)
-
+        next_actions = tf.where(next_masks, next_actions, tf.constant(-np.inf, shape=next_actions.shape))
         next_actions = tf.nn.softmax(next_actions)
-        # next_actions = tf.random.categorical(sampled_actions_probs, self.num_actions)
         
         new_q1 = self.target_critic1([next_adj_mat, next_dat_mat, next_actions], training=False)
         new_q2 = self.target_critic2([next_adj_mat, next_dat_mat, next_actions], training=False)
         new_q = tf.math.minimum(new_q1, new_q2)
+
         # Bellman equation for the q value
         q_targets = rewards + self.gamma * new_q
+
+        actions = tf.where(masks, actions, tf.constant(-np.inf, shape=actions.shape))
+        actions = tf.nn.softmax(actions)
+
         # Critic 1
         with tf.GradientTape() as tape:
             adj_mat, dat_mat = tf.split(states, num_or_size_splits=2, axis=2)
@@ -179,20 +184,13 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
             adj_mat, dat_mat = tf.split(states, num_or_size_splits=2, axis=2)
 
             actions = self.actor_model([adj_mat, dat_mat], training=True)
-            # print("ACTIONS: ", actions)
 
             # Invalid action masking with tensors
-            actions = tf.where(masks, actions, tf.zeros_like(actions))
-
+            actions = tf.where(masks, actions, tf.constant(-np.inf, shape=actions.shape))
             actions = tf.nn.softmax(actions)
-            # print("sampled_actions_probs: ", sampled_actions_probs)
 
-            # actions = tf.random.categorical(sampled_actions_probs, self.num_actions)
-            # print("ACTIONS: ", actions)
             q_value = self.critic_model1([adj_mat, dat_mat, actions], training=True)
-            # print("q_value: ", q_value)
             loss = -tf.math.reduce_mean(q_value)
-            tf.print("Actor Training Loss: ", loss)
 
         gradient = tape.gradient(loss, self.actor_model.trainable_variables)
         # print(gradient)
@@ -225,7 +223,7 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         # action_out = tf.keras.layers.Dense(self.num_actions / 1000, activation="relu", name='action_4')(action_out)
 
         # Both are passed through separate layer before concatenating
-        concat = tf.keras.layers.Add()([state_out, action_out])
+        concat = tf.keras.layers.Concatenate()([state_out, action_out])
 
         # out = tf.keras.layers.Dense(1024, activation="relu")(concat)
         # out = tf.keras.layers.Dense(512, activation="relu")(concat)
@@ -276,8 +274,8 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
                                         use_bias=True)(out)
 
         # Rescale for tanh [-1,1]
-        # outputs = tf.keras.layers.Lambda(
-        #     lambda x: ((x + 1.0) * (self.upper_bound - self.lower_bound)) / 2.0 + self.lower_bound)(outputs)
+        outputs = tf.keras.layers.Lambda(
+            lambda x: ((x + 1.0) * (self.upper_bound - self.lower_bound)) / 2.0 + self.lower_bound)(outputs)
 
         model = tf.keras.Model([adj_inputs, dat_inputs], outputs)
         model.summary()
@@ -294,7 +292,6 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         if self.ntrain_calls % self.critic_update_freq == 0:
             self.train_critic(state_batch, action_batch, reward_batch, next_state_batch, masks, next_masks)
         
-
     def _convert_to_tensor(self, state_batch, action_batch, reward_batch, next_state_batch, terminal_batch):
         masks = []
         next_masks = []

@@ -24,8 +24,8 @@ import gym
 from exarl.utils.globals import ExaGlobals
 from datetime import datetime
 
-run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_250nw_50sd_10kNoS_200e_100eps_PATCH_'
-
+# run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_15nw_3sd_500NoS_150e_100eps_mask_PATCH_'
+run_name = "Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_250nw_50sd_100KNoS_125e_100eps_"
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
 except:
@@ -206,7 +206,7 @@ class StateStatistics:
 
 class ExaExaaltGraphRLSpace(gym.Env):
 
-    metadata = {"node_count": 10000}
+    metadata = {"node_count": 100000}
 
     def __init__(self,**kwargs):
         super().__init__()
@@ -214,7 +214,7 @@ class ExaExaaltGraphRLSpace(gym.Env):
 
         """
         stateDepth       = 50 #segments
-        number_of_states = 10000
+        number_of_states = 100000
 
         self.n_states  = number_of_states
         # self.nWorkers  = 500
@@ -257,7 +257,7 @@ class ExaExaaltGraphRLSpace(gym.Env):
             self.Map[i][(i-side)%number_of_states]=R
             self.Map[i][(i+side)%number_of_states]=R
 
-        self.INITIAL_STATE              = int(((side/2)*side+side/2)/10) 
+        self.INITIAL_STATE              = int(((side/2)*side+side/2)) 
         # self.INITIAL_STATE = np.random.randint(0,self.n_states)   
         # print("INITIAL STATE: ", type(self.INITIAL_STATE))
         # print("MAP at init: ", self.Map[self.INITIAL_STATE])
@@ -458,7 +458,7 @@ class ExaExaaltGraphRLSpace(gym.Env):
 
         """ Iterates the testing process forward one step """
 
-        # reward        = 0.0*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + (added/self.nWorkers)
+        # reward        = 0.5*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + 0.5*(added/self.nWorkers)
         reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
         current_state = self.traj[-1]
 
@@ -473,7 +473,7 @@ class ExaExaaltGraphRLSpace(gym.Env):
         side = 100
 
         self.WCT                             = 0 
-        self.INITIAL_STATE                   = int(((side/2)*side+side/2)/10)
+        self.INITIAL_STATE                   = int(((side/2)*side+side/2))
         # self.INITIAL_STATE = np.random.randint(0,self.n_states)   
         self.traj                            = []
         self.database                        = {}

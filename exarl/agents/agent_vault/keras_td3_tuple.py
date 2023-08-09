@@ -294,7 +294,9 @@ class KerasTD3Tuple(exarl.ExaAgent):
 
         tf_state = tf.expand_dims(tf.convert_to_tensor(state[0]), 0)
         
-        sampled_actions = tf.squeeze(self.actor_model(tf_state))
+        test = self.actor_model(tf_state)
+        print("Output of network: ", test)
+        sampled_actions = tf.squeeze(test)
         # noise = np.random.normal(0, 0.1, self.num_actions)
 
         # Changed the noise
@@ -305,7 +307,7 @@ class KerasTD3Tuple(exarl.ExaAgent):
         # We make sure action is within bounds
         legal_action = np.clip(sampled_actions, self.lower_bound, self.upper_bound)
         # tf.print("legal_action", legal_action.shape)
-
+        print("Legal action: ", legal_action)
         # return [np.squeeze(legal_action)], [np.squeeze(noise)]
         return [np.squeeze(legal_action)], policy_type
 

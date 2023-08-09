@@ -53,7 +53,7 @@ class ExaCartpoleStatic(gym.Env):
 
     @introspectTrace()
     def step(self, action):
-        next_state, reward, done, info = self.env.step(action)
+        next_state, reward, done, _, info = self.env.step(action)
         time.sleep(0)  # Delay in seconds
 
         rank = self.env_comm.rank

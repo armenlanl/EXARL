@@ -165,23 +165,17 @@ class KerasGraphTD3RLTask(exarl.ExaAgent):
         # Use Critic 1
         with tf.GradientTape() as tape:
             actions = self.actor_model(states, training=True)
-            # print("ACTIONS: ", actions)
 
             # Invalid action masking with tensors
             actions = tf.where(masks, actions, tf.zeros_like(actions))
 
             actions = tf.nn.softmax(actions)
-            # print("sampled_actions_probs: ", sampled_actions_probs)
 
-            # actions = tf.random.categorical(sampled_actions_probs, self.num_actions)
-            # print("ACTIONS: ", actions)
             q_value = self.critic_model1([states, actions], training=True)
-            # print("q_value: ", q_value)
             loss = -tf.math.reduce_mean(q_value)
             tf.print("Actor Training Loss: ", loss)
 
         gradient = tape.gradient(loss, self.actor_model.trainable_variables)
-        # print(gradient)
         self.actor_optimizer.apply_gradients(zip(gradient, self.actor_model.trainable_variables))
 
     def get_critic(self):
@@ -253,21 +247,20 @@ class KerasGraphTD3RLTask(exarl.ExaAgent):
         for (target_weight, weight) in zip(target_weights, weights):
             target_weight.assign(weight * self.tau + target_weight * (1.0 - self.tau))
 
-    def update(self, state_batch, action_batch, reward_batch, next_state_batch):
-        # print("SHAPE OF state_batch: ", state_batch.shape)
-        # print("SHAPE OF state_batch[0]: ", state_batch[0,0].shape)
-        # print("SHAPE OF state_batch[2]: ", type(state_batch[0,2]))
-        # print("SHAPE OF next_state_batch: ", next_state_batch.shape)
-        # print("Single batch: ", state_batch[0,1].shape)
+    def update(self, state_batch, action_batch, reward_batch, next_state_batch, masks, next_masks):
+        if self.ntrain_calls % self.actor_update_freq == 0:
+            self.train_actor(state_batch, masks)
+        if self.ntrain_calls % self.critic_update_freq == 0:
+            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch, masks, next_masks)
         
-        tf_state_batch = np.zeros(shape=(len(state_batch[:,0]),self.adj_shape[0],self.adj_shape[1]))
-        tf_next_state_batch = np.zeros(shape=(len(next_state_batch[:,0]),self.adj_shape[0],self.adj_shape[1]))
+
+    def _convert_to_tensor(self, state_batch, action_batch, reward_batch, next_state_batch, terminal_batch):
         masks = []
         next_masks = []
 
-        for i in range(len(state_batch[:,0])):
-            tf_state_batch[i] = state_batch[i,0]
-            tf_next_state_batch[i] = tf_next_state_batch[i,0]
+        tf_state_batch = np.zeros(shape=(self.batch_size,self.adj_shape[0],self.adj_shape[1]))
+        tf_next_state_batch = np.zeros(shape=(self.batch_size,self.adj_shape[0],self.adj_shape[1]))
+        for i in range(self.batch_size):
 
             known_keys = [x for x in state_batch[i,2].keys() if state_batch[i,2][x] != None]
             known_keys_next = [x for x in next_state_batch[i,2].keys() if next_state_batch[i,2][x] != None]
@@ -284,33 +277,23 @@ class KerasGraphTD3RLTask(exarl.ExaAgent):
             masks.append(mask)
             next_masks.append(next_mask)
 
-        tf_state_batch = tf.convert_to_tensor(tf_state_batch, dtype=tf.float32)
-        tf_next_state_batch = tf.convert_to_tensor(tf_next_state_batch, dtype=tf.float32)
-
-        self.train_critic(tf_state_batch, action_batch, reward_batch, tf_next_state_batch, masks, next_masks)
-        self.train_actor(tf_state_batch, masks)
-
-    def _convert_to_tensor(self, state_batch, action_batch, reward_batch, next_state_batch, terminal_batch):
-        for i in range(len(state_batch[:,0])):
-            state_batch[i,0] = tf.convert_to_tensor(state_batch[i,0], dtype=tf.float32)
-        # state_batch = tf.convert_to_tensor(state_batch[:,0], dtype=tf.float32)
+            tf_state_batch[i] = tf.convert_to_tensor(state_batch[i,0], dtype=tf.float32)
+            tf_next_state_batch[i] = tf.convert_to_tensor(next_state_batch[i,0], dtype=tf.float32)
+        
         action_batch = tf.convert_to_tensor(action_batch, dtype=tf.float32)
         reward_batch = tf.convert_to_tensor(reward_batch, dtype=tf.float32)
-        for i in range(len(next_state_batch[:,0])):
-            next_state_batch[i,0] = tf.convert_to_tensor(next_state_batch[i,0], dtype=tf.float32)
-        # next_state_batch[:,0] = tf.convert_to_tensor(next_state_batch[:,0], dtype=tf.float32)
         terminal_batch = tf.convert_to_tensor(terminal_batch, dtype=tf.float32)
-        return state_batch, action_batch, reward_batch, next_state_batch, terminal_batch
+        return tf_state_batch, action_batch, reward_batch, tf_next_state_batch, terminal_batch, masks, next_masks
 
     def generate_data(self):
-        state_batch, action_batch, reward_batch, next_state_batch, done_batch = \
+        state_batch, action_batch, reward_batch, next_state_batch, done_batch, masks_batch, next_masks_batch = \
             self._convert_to_tensor(*self.memory.sample_buffer(self.batch_size))
-        yield state_batch, action_batch, reward_batch, next_state_batch, done_batch
+        yield state_batch, action_batch, reward_batch, next_state_batch, done_batch, masks_batch, next_masks_batch
 
     def train(self, batch):
         """ Method used to train """
         self.ntrain_calls += 1
-        self.update(batch[0], batch[1], batch[2], batch[3])
+        self.update(batch[0], batch[1], batch[2], batch[3], batch[5], batch[6])
 
     def update_target(self):
         if self.ntrain_calls % self.actor_update_freq == 0:

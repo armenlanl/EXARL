@@ -202,12 +202,12 @@ class ExaExaaltGraphRL(gym.Env):
         """
 
         """
-        stateDepth       = 50 #segments
-        number_of_states = 100000
+        stateDepth       = 5 #segments
+        number_of_states = 1000
 
         self.n_states  = number_of_states
         # self.nWorkers  = 500
-        self.nWorkers  = 5
+        self.nWorkers  = 25
         self.num_done  = 0
         self.WCT       = 0
         self.RUN_TIME  = 100 #10000
@@ -245,7 +245,7 @@ class ExaExaaltGraphRL(gym.Env):
             self.Map[i][(i-side)%number_of_states]=R
             self.Map[i][(i+side)%number_of_states]=R
 
-        self.INITIAL_STATE              = int((side/2)*side+side/2)    
+        self.INITIAL_STATE              = int(((side/2)*side+side/2)/10)   
         # print("INITIAL STATE: ", type(self.INITIAL_STATE))
         # print("MAP at init: ", self.Map[self.INITIAL_STATE])
 
@@ -442,7 +442,7 @@ class ExaExaaltGraphRL(gym.Env):
         reward        = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
         current_state = self.traj[-1]
 
-        next_state = [self.generate_data(), current_state, self.knownStates]
+        next_state = (self.generate_data(), current_state, self.knownStates)
         info = None
         print("Episode: ", self.WCT, " Reward: ", reward, " ", done)
         return next_state, reward, done, info
@@ -452,7 +452,7 @@ class ExaExaaltGraphRL(gym.Env):
         side = 100
 
         self.WCT                             = 0 
-        self.INITIAL_STATE                   = int((side/2)*side+side/2)
+        self.INITIAL_STATE                   = int(((side/2)*side+side/2)/10)
         self.traj                            = []
         self.database                        = {}
         self.selfTrans                       = []
@@ -466,7 +466,7 @@ class ExaExaaltGraphRL(gym.Env):
         
         self.knownStates[self.INITIAL_STATE] = StateStatistics(self.INITIAL_STATE, self.Map)
 
-        return [self.generate_data(), self.traj[-1], self.knownStates] # Return new state
+        return (self.generate_data(), self.traj[-1], self.knownStates) # Return new state
 
     def render(self):
         """ Not relevant here but left for template convenience """

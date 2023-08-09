@@ -24,7 +24,7 @@ import gym
 from exarl.utils.globals import ExaGlobals
 from datetime import datetime
 
-run_name = 'Exaalt_GraphTD3-v2_ExaExaaltGraph-v2_AC_250nw_50sd_100kNoS_100e_100eps_RAND_INIT'
+run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_25nw_5sd_1kNoS_75e_100eps_PATCH_'
 
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
@@ -202,19 +202,19 @@ class StateStatistics:
 
 class ExaExaaltGraphRLTask(gym.Env):
 
-    metadata = {"node_count": 100000}
+    metadata = {"node_count": 1000}
 
     def __init__(self,**kwargs):
         super().__init__()
         """
 
         """
-        stateDepth       = 50 #segments
-        number_of_states = 100000
+        stateDepth       = 5 #segments
+        number_of_states = 1000
 
         self.n_states  = number_of_states
         # self.nWorkers  = 500
-        self.nWorkers  = 250
+        self.nWorkers  = 25
         self.num_done  = 0
         self.WCT       = 0
         self.RUN_TIME  = 100 #10000
@@ -482,7 +482,7 @@ class ExaExaaltGraphRLTask(gym.Env):
         self.knownStates[self.INITIAL_STATE] = StateStatistics(self.INITIAL_STATE, self.Map)
 
         state_tuple = (self.generate_data(), self.traj[-1], self.knownStates)
-        return (state_tuple, {})
+        return state_tuple, {}
 
     def render(self):
         """ Not relevant here but left for template convenience """
