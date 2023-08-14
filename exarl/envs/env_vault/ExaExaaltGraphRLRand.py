@@ -25,8 +25,7 @@ from exarl.utils.globals import ExaGlobals
 from datetime import datetime
 
 # run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_15nw_3sd_500NoS_150e_100eps_mask_PATCH_'
-# run_name = "Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_250nw_50sd_100KNoS_125e_100eps_"
-run_name = 'Testing_no_softmax_'
+run_name = "Exaalt_Random_"
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
 except:
@@ -205,7 +204,7 @@ class StateStatistics:
         if(finalState!=self.label):
                 self.nTransitions+=1
 
-class ExaExaaltGraphRLSpace(gym.Env):
+class ExaExaaltGraphRLRand(gym.Env):
 
     metadata = {"node_count": 500}
 
@@ -399,20 +398,9 @@ class ExaExaaltGraphRLSpace(gym.Env):
         # The task list is a list of indices that are length of nWorkers that represent the desired trajectories to be calculated
         
         # task_list = np.random.choice(self.actions_avail, size=self.num_actions, replace=True, p=sampled_actions_probs)
-        # all_keys = [k for k,v in self.knownStates.items() if v != None]
-        # print("Allowed keys: ", all_keys)
+        all_keys = [k for k,v in self.knownStates.items() if v != None]
 
-        summation = 0
-
-        print("Action: ", action)
-
-        # for i in range(len(all_keys)):
-        #     print("Prob of hitting key ", all_keys[i], " = ", action[all_keys[i]])
-        #     summation += action[all_keys[i]]
-
-        # print("Sumamtion: ", summation)
-        
-        taskList = np.random.choice(self.actions_avail, size=self.nWorkers-1, replace=True, p=action)
+        taskList = np.random.choice(all_keys, size=self.nWorkers-1, replace=True)
         # taskList.append(self.traj[-1])
         taskList = np.append(taskList, self.traj[-1])
         print("End Traj: ", self.traj[-1])

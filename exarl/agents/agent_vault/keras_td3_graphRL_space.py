@@ -91,7 +91,7 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         self.critic_optimizer2 = Adam(critic_lr, epsilon=1e-08)
         self.actor_optimizer = Adam(actor_lr, epsilon=1e-08)
 
-        self.hidden_size = 56
+        self.hidden_size = 64
         self.layer_std = 1.0 / np.sqrt(float(self.hidden_size))
 
         # Setup models
@@ -189,11 +189,23 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
             actions = tf.where(masks, actions, tf.constant(-np.inf, shape=actions.shape))
             actions = tf.nn.softmax(actions)
 
+            tf.print("Actions in training: ", actions)
+
             q_value = self.critic_model1([adj_mat, dat_mat, actions], training=True)
+            tf.print("Q value: ", q_value)
             loss = -tf.math.reduce_mean(q_value)
+            tf.print("Loss: ", loss)
 
         gradient = tape.gradient(loss, self.actor_model.trainable_variables)
-        # print(gradient)
+        
+        for var, g in zip(self.actor_model.trainable_variables, gradient):
+            # in this loop g is the gradient of each layer
+            print(f'{var.name}, shape: {g.shape}')
+            print("gradients..")
+            print(g)
+            if tf.math.reduce_any(tf.math.is_nan(g)):
+                print("Found NaN gradient here")
+
         self.actor_optimizer.apply_gradients(zip(gradient, self.actor_model.trainable_variables))
 
     def get_critic(self):
@@ -347,11 +359,22 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         taskList = []
         taskList.append(state[1])
         known_keys = [x for x in state[2].keys() if state[2][x] != None]
+
+        weights = self.actor_model.get_weights()
+
+        for weight in weights:   
+            if np.any(np.isnan(weight)):     
+                print('Found nan weight at index {}'.format(weight.shape[0]))
         
         # create the tensor from the adj matrix and get the action size number of nodes in graph
         tf_state = tf.expand_dims(tf.convert_to_tensor(state[0]), 0)
         adj_mat, dat_mat = tf.split(tf_state, num_or_size_splits=2, axis=2)
-        sampled_actions = tf.squeeze(self.actor_model([adj_mat,dat_mat]))
+        # print("Adj matrix: ", adj_mat)
+        # print("Dat matrix: ", dat_mat)
+
+        raw_output = self.actor_model([adj_mat,dat_mat])
+        print("raw_output: ", raw_output)
+        sampled_actions = tf.squeeze(raw_output)
         
         # add noise to the sampled actions
         noise = self.ou_noise()

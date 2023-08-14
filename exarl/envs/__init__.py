@@ -114,7 +114,13 @@ elif env == 'ExaExaaltGraph-v3':
         id=env,
         entry_point='exarl.envs.env_vault:ExaExaaltGraphRLSpace'
     )
-   
+
+elif env == 'ExaExaaltGraph-vRand':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaExaaltGraphRLRand'
+    )
+
 elif env == 'Hadrec-v0':
     register(
         id=env,

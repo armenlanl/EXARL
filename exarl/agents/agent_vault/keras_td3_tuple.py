@@ -167,8 +167,13 @@ class KerasTD3Tuple(exarl.ExaAgent):
             actions = self.actor_model(states, training=True)
             q_value = self.critic_model1([states, actions], training=True)
             loss = -tf.math.reduce_mean(q_value)
-            # tf.print("Actor Training Loss: ", loss)
+            tf.print("Actor Training Loss: ", loss)
         gradient = tape.gradient(loss, self.actor_model.trainable_variables)
+        # for var, g in zip(self.actor_model.trainable_variables, gradient):
+        #     # in this loop g is the gradient of each layer
+        #     print(f'{var.name}, shape: {g.shape}')
+        #     print("gradients..")
+        #     print(g)
         self.actor_optimizer.apply_gradients(zip(gradient, self.actor_model.trainable_variables))
 
     def get_critic(self):

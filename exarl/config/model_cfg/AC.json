@@ -1,5 +1,5 @@
 {
-    "actor_lr" : 0.001,
+    "actor_lr" : 0.0001,
     "actor_dense_act" : "relu",
     "actor_dense": [256, 256],
     "actor_out_act" : "tanh",
