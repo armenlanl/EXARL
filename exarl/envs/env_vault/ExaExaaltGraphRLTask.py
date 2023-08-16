@@ -24,19 +24,19 @@ import gym
 from exarl.utils.globals import ExaGlobals
 from datetime import datetime
 
-run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_25nw_5sd_1kNoS_75e_100eps_PATCH_'
+
 
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
 except:
     graph_size = 20
 
-# NAME = np.random.randint(99999)
 
+run_name = str(ExaGlobals.lookup_params('experiment_id'))
 now = datetime.now()
-NAME = now.strftime("%d_%m_%Y_%H-%M-%S")
+NAME = now.strftime("%d_%m_%Y_%H-%M-%S_")
 
-run_name = run_name + NAME
+run_name = NAME + run_name
 
 def dirichlet_draw(alphas):
     sample = [np.random.gamma(a, 1) for a in alphas]
@@ -202,19 +202,19 @@ class StateStatistics:
 
 class ExaExaaltGraphRLTask(gym.Env):
 
-    metadata = {"node_count": 1000}
+    metadata = {"node_count": 500}
 
     def __init__(self,**kwargs):
         super().__init__()
         """
 
         """
-        stateDepth       = 5 #segments
-        number_of_states = 1000
+        stateDepth       = 3 #segments
+        number_of_states = 500
 
         self.n_states  = number_of_states
         # self.nWorkers  = 500
-        self.nWorkers  = 25
+        self.nWorkers  = 15
         self.num_done  = 0
         self.WCT       = 0
         self.RUN_TIME  = 100 #10000
@@ -273,7 +273,7 @@ class ExaExaaltGraphRLTask(gym.Env):
         # Action space is going to change to represent the number actions queued for trajectories (See the VE algorithm nWorkers tasklist for size model)
         # self.action_space      = gym.spaces.Box(np.zeros(6), np.array([100.,100.,100.,100.,100.,100.]))
         
-        self.action_space = gym.spaces.Box(low=0, high=1, shape=(self.n_states,), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(self.n_states,), dtype=np.float32)
 
         # Adj matrix for the NN
         self.adj_obs_space = gym.spaces.Box(low=0, high=np.inf, shape=(graph_size, graph_size))
@@ -458,7 +458,7 @@ class ExaExaaltGraphRLTask(gym.Env):
 
         next_state = (self.generate_data(), current_state, self.knownStates)
         info = None
-        print("Episode: ", self.WCT, " Reward: ", reward, " ", done)
+        print("Step: ", self.WCT, " Reward: ", reward, " ", done)
         return next_state, reward, done, info
 
     def reset(self):

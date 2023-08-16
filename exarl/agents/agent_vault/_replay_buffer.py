@@ -174,7 +174,7 @@ class ReplayBuffer(Replay):
 #         self.init_placeholders_data(batch_size)
 #         self.beta = beta
 #         self.alpha = alpha
-
+C
 #     def init_placeholders_data(self, batch_size):
 #         self.state_buffer = np.empty((batch_size, self.input_size))  # place holder to return values
 #         self.action_buffer = np.zeros((batch_size, self.n_actions))

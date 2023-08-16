@@ -26,7 +26,7 @@ from datetime import datetime
 
 # run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_15nw_3sd_500NoS_150e_100eps_mask_PATCH_'
 # run_name = "Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_250nw_50sd_100KNoS_125e_100eps_"
-run_name = 'Testing_no_softmax_'
+
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
 except:
@@ -34,10 +34,11 @@ except:
 
 # NAME = np.random.randint(99999)
 
+run_name = str(ExaGlobals.lookup_params('experiment_id'))
 now = datetime.now()
-NAME = now.strftime("%d_%m_%Y_%H-%M-%S")
+NAME = now.strftime("%d_%m_%Y_%H-%M-%S_")
 
-run_name = run_name + NAME
+run_name = NAME + run_name
 
 def dirichlet_draw(alphas):
     sample = [np.random.gamma(a, 1) for a in alphas]
@@ -119,14 +120,15 @@ def get_graph_adj(knownStates, state, database):
 
 def VE(traj, knownStates, database, nWorkers, d_prior):
     print('running VE... '+str(len(knownStates.keys()))+' states discovered')
+    knownStates_keys = [k for k,v in knownStates.items() if v != None]
     builds={}
-    for a in knownStates.keys():
+    for a in knownStates_keys:
         builds[a]=0
 
     taskList=[]
     for _ in range(nWorkers):
         virtuallyConsumed={}
-        for i in knownStates.keys():
+        for i in knownStates_keys:
             virtuallyConsumed[i]=0
 
         state=traj[-1]
@@ -141,13 +143,13 @@ def VE(traj, knownStates, database, nWorkers, d_prior):
                 offset      = np.array([0., 0., 0., 0., 0., 0.])
                 prior_p     = d_prior[0] + offset + 1.e-6
                 graph_dist  = get_graph_dist(knownStates, state)
-                d_alpha     = np.array([ prior_p[graph_dist[key]] for key in knownStates.keys() ])
+                d_alpha     = np.array([ prior_p[graph_dist[key]] for key in knownStates_keys ])
                 # print("dalpha: ", d_alpha)
                 # print("KNOWN STATES: ", knownStates.keys(), d_alpha)
                 # print(graph_dist)
                 # print("Dist 1:", knownStates[state].probs.keys())
                 # print(d_prior)
-                keylist = list(knownStates.keys())
+                keylist = list(knownStates_keys)
                 for ii in range(d_alpha.size):
                     try:
                         d_alpha[ii] = d_alpha[ii] + knownStates[state].counts[keylist[ii]]
@@ -165,7 +167,7 @@ def VE(traj, knownStates, database, nWorkers, d_prior):
                     #print("sample_p: ", sample_p)
                 # print(count_num)
                 # print(sample_p)
-                state      = np.random.choice(list(knownStates.keys()),p=sample_p)
+                state      = np.random.choice(list(knownStates_keys),p=sample_p)
                 # print("STATE: ",state)
                 # print("KNOWNSTATE KEYS: ", knownStates[state].probs.keys())
                 # print("====================")
@@ -207,7 +209,7 @@ class StateStatistics:
 
 class ExaExaaltGraphRLSpace(gym.Env):
 
-    metadata = {"node_count": 500}
+    metadata = {"node_count": 250}
 
     def __init__(self,**kwargs):
         super().__init__()
@@ -215,7 +217,7 @@ class ExaExaaltGraphRLSpace(gym.Env):
 
         """
         stateDepth       = 3 #segments
-        number_of_states = 500
+        number_of_states = 250
 
         self.n_states  = number_of_states
         # self.nWorkers  = 500
@@ -404,7 +406,7 @@ class ExaExaaltGraphRLSpace(gym.Env):
 
         summation = 0
 
-        print("Action: ", action)
+        # print("Action: ", action)
 
         # for i in range(len(all_keys)):
         #     print("Prob of hitting key ", all_keys[i], " = ", action[all_keys[i]])
@@ -415,9 +417,10 @@ class ExaExaaltGraphRLSpace(gym.Env):
         taskList = np.random.choice(self.actions_avail, size=self.nWorkers-1, replace=True, p=action)
         # taskList.append(self.traj[-1])
         taskList = np.append(taskList, self.traj[-1])
+
+        # taskList = VE(self.traj, self.knownStates, self.database, self.nWorkers, action)
         print("End Traj: ", self.traj[-1])
         print("Task List: ", taskList)
-        # taskList = VE(self.traj, self.knownStates, self.database, self.nWorkers, action)
 
         # taskList = [self.INITIAL_STATE] * self.nWorkers
 
@@ -473,7 +476,9 @@ class ExaExaaltGraphRLSpace(gym.Env):
         """ Iterates the testing process forward one step """
 
         # reward        = 0.5*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + 0.5*(added/self.nWorkers)
+
         reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
+        
         current_state = self.traj[-1]
 
         adj_mat = self.generate_data()

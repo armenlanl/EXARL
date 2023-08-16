@@ -169,6 +169,7 @@ def VE(traj, knownStates, database, nWorkers, d_prior):
                     #print("d_alpha: ", d_alpha)
                     # sample_p   = np.random.dirichlet(count_num+d_alpha)
                     # sample_p   = np.random.dirichlet(d_alpha)
+                    print("d_alpha", d_alpha)
                     sample_p   = dirichlet_draw(d_alpha)
                     #print("sample_p: ", sample_p)
                 # print(count_num)
@@ -439,7 +440,7 @@ class ExaExaaltGraph(gym.Env):
         self.database[self.INITIAL_STATE]    = []
         self.traj.append(self.INITIAL_STATE)
 
-        return self.generate_data() # Return new state
+        return self.generate_data(), {} # Return new state
 
     def render(self):
         """ Not relevant here but left for template convenience """

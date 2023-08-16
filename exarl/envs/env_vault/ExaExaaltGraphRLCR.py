@@ -21,10 +21,12 @@
 
 import numpy  as np
 import gym
+from mpi4py import MPI
 from exarl.utils.globals import ExaGlobals
 from datetime import datetime
 
 # run_name = 'Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_15nw_3sd_500NoS_150e_100eps_mask_PATCH_'
+# run_name = "Exaalt_GraphTD3-v3_ExaExaaltGraph-v3_AC_250nw_50sd_100KNoS_125e_100eps_"
 
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
@@ -38,6 +40,7 @@ now = datetime.now()
 NAME = now.strftime("%d_%m_%Y_%H-%M-%S_")
 
 run_name = NAME + run_name
+
 def dirichlet_draw(alphas):
     sample = [np.random.gamma(a, 1) for a in alphas]
     sums   = sum(sample)
@@ -118,14 +121,15 @@ def get_graph_adj(knownStates, state, database):
 
 def VE(traj, knownStates, database, nWorkers, d_prior):
     print('running VE... '+str(len(knownStates.keys()))+' states discovered')
+    knownStates_keys = [k for k,v in knownStates.items() if v != None]
     builds={}
-    for a in knownStates.keys():
+    for a in knownStates_keys:
         builds[a]=0
 
     taskList=[]
     for _ in range(nWorkers):
         virtuallyConsumed={}
-        for i in knownStates.keys():
+        for i in knownStates_keys:
             virtuallyConsumed[i]=0
 
         state=traj[-1]
@@ -140,13 +144,13 @@ def VE(traj, knownStates, database, nWorkers, d_prior):
                 offset      = np.array([0., 0., 0., 0., 0., 0.])
                 prior_p     = d_prior[0] + offset + 1.e-6
                 graph_dist  = get_graph_dist(knownStates, state)
-                d_alpha     = np.array([ prior_p[graph_dist[key]] for key in knownStates.keys() ])
+                d_alpha     = np.array([ prior_p[graph_dist[key]] for key in knownStates_keys ])
                 # print("dalpha: ", d_alpha)
                 # print("KNOWN STATES: ", knownStates.keys(), d_alpha)
                 # print(graph_dist)
                 # print("Dist 1:", knownStates[state].probs.keys())
                 # print(d_prior)
-                keylist = list(knownStates.keys())
+                keylist = list(knownStates_keys)
                 for ii in range(d_alpha.size):
                     try:
                         d_alpha[ii] = d_alpha[ii] + knownStates[state].counts[keylist[ii]]
@@ -164,7 +168,7 @@ def VE(traj, knownStates, database, nWorkers, d_prior):
                     #print("sample_p: ", sample_p)
                 # print(count_num)
                 # print(sample_p)
-                state      = np.random.choice(list(knownStates.keys()),p=sample_p)
+                state      = np.random.choice(list(knownStates_keys),p=sample_p)
                 # print("STATE: ",state)
                 # print("KNOWNSTATE KEYS: ", knownStates[state].probs.keys())
                 # print("====================")
@@ -204,23 +208,22 @@ class StateStatistics:
         if(finalState!=self.label):
                 self.nTransitions+=1
 
-class ExaExaaltGraphRLRand(gym.Env):
+class ExaExaaltGraphRLCR(gym.Env):
 
-    metadata = {"node_count": 10000}
+    metadata = {"node_count": 2500}
 
     def __init__(self,**kwargs):
         super().__init__()
         """
-
         """
-        stateDepth       = 3 #segments
-        number_of_states = 10000
+        stateDepth       = 5 #segments
+        number_of_states = 2500
 
         self.n_states  = number_of_states
-        self.nWorkers  = 15
-        self.num_done  = 0
+        self.nWorkers  = 25
+        self.reward    = 0
         self.WCT       = 0
-        self.RUN_TIME  = 1000 #10000
+        self.RUN_TIME  = int(ExaGlobals.lookup_params('n_steps'))
         
         self.database    = {}
         self.knownStates = {}
@@ -276,7 +279,7 @@ class ExaExaaltGraphRLRand(gym.Env):
         # Action space is going to change to represent the number actions queued for trajectories (See the VE algorithm nWorkers tasklist for size model)
         # self.action_space      = gym.spaces.Box(np.zeros(6), np.array([100.,100.,100.,100.,100.,100.]))
         
-        self.action_space = gym.spaces.Box(low=0, high=1, shape=(self.n_states,), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(self.n_states,), dtype=np.float32)
 
         # Adj matrix for the NN
         self.adj_obs_space = gym.spaces.Box(low=0, high=np.inf, shape=(graph_size, graph_size*2))
@@ -388,6 +391,9 @@ class ExaExaaltGraphRLRand(gym.Env):
         pass
 
     def step(self, action):
+
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
         done = False
         # launchStates = np.random.choice(range(self.n_states), size=self.nWorkers)#, p=action)
         # self.crankModel()
@@ -397,20 +403,26 @@ class ExaExaaltGraphRLRand(gym.Env):
         # The task list is a list of indices that are length of nWorkers that represent the desired trajectories to be calculated
         
         # task_list = np.random.choice(self.actions_avail, size=self.num_actions, replace=True, p=sampled_actions_probs)
-        all_keys = [k for k,v in self.knownStates.items() if v != None]
+        # all_keys = [k for k,v in self.knownStates.items() if v != None]
+        # print("Allowed keys: ", all_keys)
 
-        print("number of discovered states: ", len(all_keys))
+        # summation = 0
+        # for i in range(len(all_keys)):
+        #     print("Prob of hitting key ", all_keys[i], " = ", action[all_keys[i]])
+        #     summation += action[all_keys[i]]
 
-        taskList = np.random.choice(all_keys, size=self.nWorkers-1, replace=True)
-        # taskList.append(self.traj[-1])
+        # print("Sumamtion: ", summation)
+        
+        taskList = np.random.choice(self.actions_avail, size=self.nWorkers-1, replace=True, p=action)
         taskList = np.append(taskList, self.traj[-1])
-        print("End Traj: ", self.traj[-1])
-        print("Task List: ", taskList)
+
         # taskList = VE(self.traj, self.knownStates, self.database, self.nWorkers, action)
+        # print("End Traj: ", self.traj[-1])
+        # print("Task List: ", taskList)
 
         # taskList = [self.INITIAL_STATE] * self.nWorkers
 
-        # print("Tasklist: ", taskList)
+        print("Tasklist: ", taskList)
         for i in range(self.nWorkers):
             workerID   = i
             buildState = taskList[i] # launchStates[i]
@@ -439,37 +451,48 @@ class ExaExaaltGraphRLRand(gym.Env):
             #             '\n')
         added = 0
         self.WCT+=1
+        taskList = list(taskList)
+        # print("Untouched tasklist: ", taskList)
         while(True):
             current_state=self.traj[-1]
+            next_state = None
             try:
                 next_state=self.database[current_state].pop(0)
+                # print("Next state: ", next_state)
                 self.traj.append(next_state)
-                added += 1
             except:
-                
-                with open("./outputs/"+run_name, "a") as myfile:
+                with open("./outputs/" + run_name + "_" + str(rank), "a") as myfile:
                         myfile.write(
                         str(round(self.WCT,3))+' '+
                         str(len(self.traj))+' '+
                         str(self.WCT*self.nWorkers)+' '+
                         str((len(self.traj)-1)/float(self.WCT*self.nWorkers))+' '+
+                        str(added)+' '+
                         '\n')
                 break
+            if (next_state in taskList):
+                added += 1
+                taskList.remove(next_state)
+                # print("Modified tasklist: ", taskList)
+                
+
 
         if (self.WCT >= self.RUN_TIME):
+            # self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers) 
             done = True
 
         """ Iterates the testing process forward one step """
 
-        # reward        = 0.5*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + 0.5*(added/self.nWorkers)
-        reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
+        # self.reward = 0.5*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + 0.5*(added/self.nWorkers)
+        self.reward = (added/self.nWorkers)
         current_state = self.traj[-1]
 
         adj_mat = self.generate_data()
         next_state = (adj_mat, current_state, self.knownStates)
         info = None
-        print("Step: ", self.WCT, " Reward: ", reward, " ", done, " Added values: ", added)
-        return next_state, reward, done, info
+        # if (rank == 1):
+        print("Step: ", self.WCT, " Reward: ", self.reward, " ", done, " Added: ", added)
+        return next_state, self.reward, done, info
 
     def reset(self):
         """ Start environment over """
@@ -477,7 +500,8 @@ class ExaExaaltGraphRLRand(gym.Env):
 
         self.WCT                             = 0 
         self.INITIAL_STATE                   = int(((side/2)*side+side/2)/100)
-        # self.INITIAL_STATE = np.random.randint(0,self.n_states)   
+        # self.INITIAL_STATE = np.random.randint(0,self.n_states)  
+        self.reward                          = 0 
         self.traj                            = []
         self.database                        = {}
         self.selfTrans                       = []
@@ -499,33 +523,5 @@ class ExaExaaltGraphRLRand(gym.Env):
         return 0
     
     def generate_data(self):
-        # prob_dist    = np.zeros(self.n_states)
-        # curr_state   = self.traj[-1]
-        # total_counts = 0
-        # out_counts   = 0
-        # for j in self.knownStates[curr_state].counts.keys():
-        #     if(j in list(self.knownStates.keys())):
-        #         if(curr_state!=j):
-        #             total_counts += self.knownStates[curr_state].counts[j]+self.knownStates[j].counts[curr_state]
-        #             out_counts   += self.knownStates[curr_state].counts[j]+self.knownStates[j].counts[curr_state]
-        #         else:
-        #             total_counts += self.knownStates[curr_state].counts[j]+self.knownStates[j].counts[curr_state]
-        # next_state = np.array([total_counts, out_counts]) 
-        # print(list(self.Map[curr_state].values()))
-        # print(list(self.Map[curr_state].keys()))
-        # print(list(self.Map.keys()))
-        # print(list(self.knownStates.keys()))
-        # prob_dist[self.Map[curr_state].keys()] = 1. * np.array(list(self.Map[curr_state].values()))
-
-        # for ii in range(5):
-        #     t_mat = np.zeros(self.n_states, self.n_states)
-        #     for jj in np.where(prob_dist > 0.)[0]:
-        #         t_mat[jj,self.Map[jj].keys()] = list(self.Map[jj].values())
-        #     prob_dist = t_mat @ prob_dist
-
-        # self.state_order = np.argsort(prob_dist)[::-1]
-        # next_state       = prob_dist[self.state_order]
-        # print("Trajectory position: ", self.traj[-1])
-        # print(self.knownStates[self.traj[-1]])
         return get_graph_adj(self.knownStates, self.traj[-1], self.database)
 

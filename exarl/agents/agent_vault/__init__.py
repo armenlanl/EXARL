@@ -24,5 +24,7 @@ elif agent == 'GraphTD3-v2':
     from exarl.agents.agent_vault.keras_td3_graphRL_task import KerasGraphTD3RLTask
 elif agent == 'GraphTD3-v3':
     from exarl.agents.agent_vault.keras_td3_graphRL_space import KerasGraphTD3RLSpace
+elif agent == 'GraphTD3-v4':
+    from exarl.agents.agent_vault.keras_td3_graphRL_cr import KerasGraphTD3RLCR
 elif agent == 'PARS-v0':
     from exarl.agents.agent_vault.PARS import PARS

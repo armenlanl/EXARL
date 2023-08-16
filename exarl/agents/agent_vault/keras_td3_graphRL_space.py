@@ -57,7 +57,10 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         # print("OBSERVATION SPACE SHAPE: ", env.observation_space.shape)
         self.num_states = env.observation_space.shape#[0]
         self.adj_shape = env.observation_space[0].shape
-        self.adj_shape = (20,20)
+        self.adj_shape = (self.adj_shape[0], int(self.adj_shape[1]/2))
+
+        print("adj shape: ", self.adj_shape)
+
         # print("ADJ SPACE SHAPE: ", self.adj_shape)
         self.num_actions = env.action_space.shape[0]
         # print("NODE COUNT: ", env.metadata["node_count"])
@@ -189,22 +192,22 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
             actions = tf.where(masks, actions, tf.constant(-np.inf, shape=actions.shape))
             actions = tf.nn.softmax(actions)
 
-            tf.print("Actions in training: ", actions)
+            # tf.print("Actions in training: ", actions)
 
             q_value = self.critic_model1([adj_mat, dat_mat, actions], training=True)
-            tf.print("Q value: ", q_value)
+            # tf.print("Q value: ", q_value)
             loss = -tf.math.reduce_mean(q_value)
             tf.print("Loss: ", loss)
 
         gradient = tape.gradient(loss, self.actor_model.trainable_variables)
         
-        for var, g in zip(self.actor_model.trainable_variables, gradient):
-            # in this loop g is the gradient of each layer
-            print(f'{var.name}, shape: {g.shape}')
-            print("gradients..")
-            print(g)
-            if tf.math.reduce_any(tf.math.is_nan(g)):
-                print("Found NaN gradient here")
+        # for var, g in zip(self.actor_model.trainable_variables, gradient):
+        #     # in this loop g is the gradient of each layer
+        #     print(f'{var.name}, shape: {g.shape}')
+        #     print("gradients..")
+        #     print(g)
+        #     if tf.math.reduce_any(tf.math.is_nan(g)):
+        #         print("Found NaN gradient here")
 
         self.actor_optimizer.apply_gradients(zip(gradient, self.actor_model.trainable_variables))
 
@@ -254,7 +257,6 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         # MLP
         
         adj_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        #
         state_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(adj_inputs)
         state_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(state_out)
         state_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(state_out)
@@ -360,11 +362,11 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         taskList.append(state[1])
         known_keys = [x for x in state[2].keys() if state[2][x] != None]
 
-        weights = self.actor_model.get_weights()
+        # weights = self.actor_model.get_weights()
 
-        for weight in weights:   
-            if np.any(np.isnan(weight)):     
-                print('Found nan weight at index {}'.format(weight.shape[0]))
+        # for weight in weights:   
+        #     if np.any(np.isnan(weight)):     
+        #         print('Found nan weight at index {}'.format(weight.shape[0]))
         
         # create the tensor from the adj matrix and get the action size number of nodes in graph
         tf_state = tf.expand_dims(tf.convert_to_tensor(state[0]), 0)
@@ -373,7 +375,7 @@ class KerasGraphTD3RLSpace(exarl.ExaAgent):
         # print("Dat matrix: ", dat_mat)
 
         raw_output = self.actor_model([adj_mat,dat_mat])
-        print("raw_output: ", raw_output)
+        # print("raw_output: ", raw_output)
         sampled_actions = tf.squeeze(raw_output)
         
         # add noise to the sampled actions

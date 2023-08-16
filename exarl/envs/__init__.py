@@ -115,6 +115,12 @@ elif env == 'ExaExaaltGraph-v3':
         entry_point='exarl.envs.env_vault:ExaExaaltGraphRLSpace'
     )
 
+elif env == 'ExaExaaltGraph-v4':
+    register(
+        id=env,
+        entry_point='exarl.envs.env_vault:ExaExaaltGraphRLCR'
+    )
+
 elif env == 'ExaExaaltGraph-vRand':
     register(
         id=env,
