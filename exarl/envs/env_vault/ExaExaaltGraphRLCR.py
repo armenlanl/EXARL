@@ -102,7 +102,7 @@ def get_graph_adj(knownStates, state, database):
             
         graph_keys.append(new_keys)
     
-    # print("INC KEY: ", inc_keys)
+    # print("INC KEY: ", len(inc_keys))
 
     for ii, row_key in enumerate(inc_keys):
         # print("ROW KEY: ", row_key)
@@ -117,7 +117,7 @@ def get_graph_adj(knownStates, state, database):
 
     # adj_mat, dat_mat = np.split(adj_mat, 2, axis=1)
 
-    return adj_mat
+    return adj_mat, inc_keys
 
 def VE(traj, knownStates, database, nWorkers, d_prior):
     print('running VE... '+str(len(knownStates.keys()))+' states discovered')
@@ -220,6 +220,7 @@ class ExaExaaltGraphRLCR(gym.Env):
         number_of_states = 2500
 
         self.n_states  = number_of_states
+        self.graph_len = graph_size
         self.nWorkers  = 25
         self.reward    = 0
         self.WCT       = 0
@@ -267,7 +268,10 @@ class ExaExaaltGraphRLCR(gym.Env):
 
 
         self.database[self.INITIAL_STATE]    = []
-        self.traj.append(self.INITIAL_STATE)                                              
+        self.traj.append(self.INITIAL_STATE)    
+
+        self.adj_states = np.zeros(self.graph_len, dtype=int)
+        self.adj_states[0] = self.INITIAL_STATE                       
 
 
         # Set bounds using the structure in the Cartpole example
@@ -279,7 +283,7 @@ class ExaExaaltGraphRLCR(gym.Env):
         # Action space is going to change to represent the number actions queued for trajectories (See the VE algorithm nWorkers tasklist for size model)
         # self.action_space      = gym.spaces.Box(np.zeros(6), np.array([100.,100.,100.,100.,100.,100.]))
         
-        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(self.n_states,), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(self.graph_len,), dtype=np.float32)
 
         # Adj matrix for the NN
         self.adj_obs_space = gym.spaces.Box(low=0, high=np.inf, shape=(graph_size, graph_size*2))
@@ -412,9 +416,11 @@ class ExaExaaltGraphRLCR(gym.Env):
         #     summation += action[all_keys[i]]
 
         # print("Sumamtion: ", summation)
+
+        # print("Action: ", action)
         
-        taskList = np.random.choice(self.actions_avail, size=self.nWorkers-1, replace=True, p=action)
-        taskList = np.append(taskList, self.traj[-1])
+        taskList = np.random.choice(self.adj_states, size=self.nWorkers, replace=True, p=action)
+        # taskList = np.append(taskList, self.traj[-1])
 
         # taskList = VE(self.traj, self.knownStates, self.database, self.nWorkers, action)
         # print("End Traj: ", self.traj[-1])
@@ -422,7 +428,7 @@ class ExaExaaltGraphRLCR(gym.Env):
 
         # taskList = [self.INITIAL_STATE] * self.nWorkers
 
-        print("Tasklist: ", taskList)
+        # print("Tasklist: ", taskList)
         for i in range(self.nWorkers):
             workerID   = i
             buildState = taskList[i] # launchStates[i]
@@ -484,11 +490,13 @@ class ExaExaaltGraphRLCR(gym.Env):
         """ Iterates the testing process forward one step """
 
         # self.reward = 0.5*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + 0.5*(added/self.nWorkers)
-        self.reward = (added/self.nWorkers)
+        # self.reward = (added/self.nWorkers)
+        self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
         current_state = self.traj[-1]
-
-        adj_mat = self.generate_data()
+        adj_mat, inc_keys = self.generate_data()
+        np.put(self.adj_states, np.arange(len(inc_keys)), inc_keys)        
         next_state = (adj_mat, current_state, self.knownStates)
+
         info = None
         # if (rank == 1):
         print("Step: ", self.WCT, " Reward: ", self.reward, " ", done, " Added: ", added)
@@ -509,12 +517,15 @@ class ExaExaaltGraphRLCR(gym.Env):
         self.knownStates                     = {}
         self.database[self.INITIAL_STATE]    = []
         self.traj.append(self.INITIAL_STATE)
+        self.adj_states = np.zeros(20, dtype=int)
+        self.adj_states[0] = self.INITIAL_STATE      
 
         for i in range(self.n_states):
             self.knownStates[i] = None
         
         self.knownStates[self.INITIAL_STATE] = StateStatistics(self.INITIAL_STATE, self.Map)
-        adj_mat = self.generate_data()
+        adj_mat, inc_keys = self.generate_data()
+
         state_tuple = (adj_mat, self.traj[-1], self.knownStates)
         return state_tuple, {} # Return new state
 

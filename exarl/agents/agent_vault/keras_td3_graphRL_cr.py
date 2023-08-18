@@ -35,6 +35,7 @@ import exarl
 from exarl.utils.globals import ExaGlobals
 from exarl.utils.OUActionNoise import OUActionNoise
 from exarl.agents.agent_vault._replay_buffer import ReplayBuffer
+from exarl.agents.agent_vault._replay_buffer import nStepBuffer
 logger = ExaGlobals.setup_logger(__name__)
 
 try:
@@ -59,33 +60,34 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
         self.adj_shape = env.observation_space[0].shape
         self.adj_shape = (self.adj_shape[0], int(self.adj_shape[1]/2))
 
-        print("adj shape: ", self.adj_shape)
-
         # print("ADJ SPACE SHAPE: ", self.adj_shape)
         self.num_actions = env.action_space.shape[0]
         # print("NODE COUNT: ", env.metadata["node_count"])
         self.node_count = env.metadata["node_count"]
-        self.actions_avail = np.arange(0, self.node_count, 1)
         self.upper_bound = env.action_space.high
         self.lower_bound = env.action_space.low
         # print('upper_bound: ', self.upper_bound)
         # print('lower_bound: ', self.lower_bound)
 
+        # Used to update target networks
+        self.tau = ExaGlobals.lookup_params('tau')
+        self.gamma = ExaGlobals.lookup_params('gamma')
+
         # Buffer
         self.buffer_counter = 0
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
         self.batch_size = ExaGlobals.lookup_params('batch_size')
-        self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
+        self.horizon = 100
+        if self.horizon == 1:
+            self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
+        else:
+            self.memory = nStepBuffer(self.buffer_capacity, self.num_states, self.num_actions, self.horizon, self.gamma)
         # self.state_buffer = np.zeros((self.buffer_capacity, self.num_states))
         # self.action_buffer = np.zeros((self.buffer_capacity, self.num_actions))
         # self.reward_buffer = np.zeros((self.buffer_capacity, 1))
         # self.next_state_buffer = np.zeros((self.buffer_capacity, self.num_states))
         # self.done_buffer = np.zeros((self.buffer_capacity, 1))
         self.per_buffer = np.ones((self.buffer_capacity, 1))
-
-        # Used to update target networks
-        self.tau = ExaGlobals.lookup_params('tau')
-        self.gamma = ExaGlobals.lookup_params('gamma')
 
         # Setup Optimizers
         critic_lr = ExaGlobals.lookup_params('critic_lr')
@@ -117,7 +119,6 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
         self.actor_update_freq = int(ExaGlobals.lookup_params('n_steps')/100)
         self.target_critic_update_freq = int(ExaGlobals.lookup_params('n_steps')/100)
         self.critic_update_freq = int(ExaGlobals.lookup_params('n_steps')/50)
-        print("Long update")
 
         # Ornstein-Uhlenbeck process
         std_dev = 0.2
@@ -198,7 +199,7 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
             q_value = self.critic_model1([adj_mat, dat_mat, actions], training=True)
             # tf.print("Q value: ", q_value)
             loss = -tf.math.reduce_mean(q_value)
-            tf.print("Loss: ", loss)
+            # tf.print("Loss: ", loss)
 
         gradient = tape.gradient(loss, self.actor_model.trainable_variables)
         
@@ -281,14 +282,14 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
         out = tf.keras.layers.BatchNormalization()(out)
         out = tf.keras.layers.Activation(tf.nn.leaky_relu)(out)
         #Outputs 
-        outputs = tf.keras.layers.Dense(self.node_count, activation="tanh",
+        outputs = tf.keras.layers.Dense(self.num_actions, activation="tanh",
                                         kernel_initializer=RandomUniform(-self.layer_std, +self.layer_std),
                                         bias_initializer=RandomUniform(-self.layer_std, +self.layer_std),
                                         use_bias=True)(out)
 
-        # Rescale for tanh [-1,1]
-        outputs = tf.keras.layers.Lambda(
-            lambda x: ((x + 1.0) * (self.upper_bound - self.lower_bound)) / 2.0 + self.lower_bound)(outputs)
+        # # Rescale for tanh [-1,1]
+        # outputs = tf.keras.layers.Lambda(
+        #     lambda x: ((x + 1.0) * (self.upper_bound - self.lower_bound)) / 2.0 + self.lower_bound)(outputs)
 
         model = tf.keras.Model([adj_inputs, dat_inputs], outputs)
         model.summary()
@@ -313,19 +314,32 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
 
         tf_state_batch = np.zeros(shape=(self.batch_size,self.adj_shape[0],self.adj_shape[1]*2))
         tf_next_state_batch = np.zeros(shape=(self.batch_size,self.adj_shape[0],self.adj_shape[1]*2))
+
         for i in range(self.batch_size):
 
             known_keys = [x for x in state_batch[i,2].keys() if state_batch[i,2][x] != None]
             known_keys_next = [x for x in next_state_batch[i,2].keys() if next_state_batch[i,2][x] != None]
 
-            mask_indices = np.array(known_keys)
-            next_mask_indices = np.array(known_keys_next)
+            # only need to make mask if we do not know graph size number of keys
+            mask = np.full(self.num_actions, True)
+            next_mask = np.full(self.num_actions, True)
 
-            mask = np.full(self.node_count, False)
-            mask[mask_indices] = True
+            if (len(known_keys) < self.num_actions):
+                mask_indices = np.arange(len(known_keys),self.num_actions)
+                mask[mask_indices] = False
 
-            next_mask = np.full(self.node_count, False)
-            next_mask[next_mask_indices] = True
+            if (len(known_keys_next) < self.num_actions):
+                next_mask_indices = np.arange(len(known_keys_next),self.num_actions)
+                next_mask[next_mask_indices] = False
+
+            # mask_indices = np.array(known_keys)
+            # next_mask_indices = np.array(known_keys_next)
+
+            # mask = np.full(self.node_count, False)
+            # mask[mask_indices] = True
+
+            # next_mask = np.full(self.node_count, False)
+            # next_mask[next_mask_indices] = True
 
             masks.append(mask)
             next_masks.append(next_mask)
@@ -384,18 +398,20 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
         # add noise to the sampled actions
         noise = self.ou_noise()
         sampled_actions = sampled_actions.numpy() + noise
-
-        mask_indices = np.array(known_keys)
-        mask = np.zeros(self.node_count, dtype=int)
-        mask[mask_indices] = 1
-        sampled_actions_masked = sampled_actions*mask
+        if (len(known_keys) < self.num_actions):
+            np.put(sampled_actions, np.arange(len(known_keys), self.num_actions), -np.inf*np.ones(int(self.num_actions-len(known_keys))))
+        # print("After: ", sampled_actions)
+        # mask_indices = np.array(known_keys)
+        # mask = np.zeros(self.node_count, dtype=int)
+        # mask[mask_indices] = 1
+        # sampled_actions_masked = sampled_actions*mask
 
         # Mask all zerod out values to very large negative value
-        for x in range(self.node_count):
-            if sampled_actions_masked[x] == 0:
-                sampled_actions_masked[x] = float('-inf')
+        # for x in range(self.node_count):
+        #     if sampled_actions_masked[x] == 0:
+        #         sampled_actions_masked[x] = float('-inf')
 
-        sampled_actions_probs = softmax(sampled_actions_masked)
+        sampled_actions_probs = softmax(sampled_actions)
 
         return sampled_actions_probs, policy_type
 
