@@ -41,7 +41,7 @@ elif env == 'ExaExaaltGraph-v2':
 elif env == 'ExaExaaltGraph-v3':
     from exarl.envs.env_vault.ExaExaaltGraphRLSpace import ExaExaaltGraphRLSpace
 elif env == 'ExaExaaltGraph-v4':
-    from exarl.envs.env_vault.ExaExaaltGraphRLCR import ExaExaaltGraphRLCR
+    from exarl.envs.env_vault.ExaExaaltGraphRLConst import ExaExaaltGraphRLConst
 elif env == 'ExaExaaltGraph-vRand':
     from exarl.envs.env_vault.ExaExaaltGraphRLRand import ExaExaaltGraphRLRand
 elif env == 'ExaPendulum-v0':

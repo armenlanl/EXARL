@@ -58,7 +58,7 @@ elif agent == 'GraphTD3-v3':
 elif agent == 'GraphTD3-v4':
     register(
         id=agent,
-        entry_point='exarl.agents.agent_vault:KerasGraphTD3RLCR'
+        entry_point='exarl.agents.agent_vault:KerasGraphTD3RLConst'
     )
 elif agent == 'PARS-v0':
     register(
