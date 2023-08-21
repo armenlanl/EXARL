@@ -27,6 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 import numpy as np
 import tensorflow as tf
+from datetime import datetime
 from tensorflow.keras.initializers import RandomUniform
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import layers
@@ -36,6 +37,12 @@ from exarl.utils.globals import ExaGlobals
 from exarl.utils.OUActionNoise import OUActionNoise
 from exarl.agents.agent_vault._replay_buffer import ReplayBuffer
 logger = ExaGlobals.setup_logger(__name__)
+
+run_name = str(ExaGlobals.lookup_params('experiment_id'))
+now = datetime.now()
+NAME = now.strftime("%d_%m_%Y_%H-%M-%S_")
+
+run_name = NAME + run_name
 
 class KerasTD3Tuple(exarl.ExaAgent):
 
@@ -125,12 +132,23 @@ class KerasTD3Tuple(exarl.ExaAgent):
         self.epsilon_min = ExaGlobals.lookup_params('epsilon_min')
         self.epsilon_decay = ExaGlobals.lookup_params('epsilon_decay')
 
+        # Logging Metrics
         logger().info("TD3 buffer capacity {}".format(self.buffer_capacity))
         logger().info("TD3 batch size {}".format(self.batch_size))
         logger().info("TD3 tau {}".format(self.tau))
         logger().info("TD3 gamma {}".format(self.gamma))
         logger().info("TD3 critic_lr {}".format(critic_lr))
         logger().info("TD3 actor_lr {}".format(actor_lr))
+
+        # Actor logs
+        self.debug_mode = True
+        if self.debug_mode:
+            tf.config.run_functions_eagerly(True)
+            self.actor_loss_log = None
+            self.critic1_loss_log = None
+            self.critic2_loss_log = None
+            self.actions_log = []
+
 
     @tf.function
     def train_critic(self, states, actions, rewards, next_states):
@@ -149,6 +167,8 @@ class KerasTD3Tuple(exarl.ExaAgent):
             q_values1 = self.critic_model1([states, actions], training=True)
             td_errors1 = q_values1 - q_targets
             critic_loss1 = tf.reduce_mean(tf.math.square(td_errors1))
+            if self.debug_mode:
+                self.critic1_loss_log = critic_loss1.numpy()
         gradient1 = tape.gradient(critic_loss1, self.critic_model1.trainable_variables)
         self.critic_optimizer1.apply_gradients(zip(gradient1, self.critic_model1.trainable_variables))
 
@@ -157,8 +177,11 @@ class KerasTD3Tuple(exarl.ExaAgent):
             q_values2 = self.critic_model2([states, actions], training=True)
             td_errors2 = q_values2 - q_targets
             critic_loss2 = tf.reduce_mean(tf.math.square(td_errors2))
+            if self.debug_mode:
+                self.critic2_loss_log = critic_loss2.numpy()
         gradient2 = tape.gradient(critic_loss2, self.critic_model2.trainable_variables)
         self.critic_optimizer2.apply_gradients(zip(gradient2, self.critic_model2.trainable_variables))
+
 
     @tf.function
     def train_actor(self, states):
@@ -167,7 +190,9 @@ class KerasTD3Tuple(exarl.ExaAgent):
             actions = self.actor_model(states, training=True)
             q_value = self.critic_model1([states, actions], training=True)
             loss = -tf.math.reduce_mean(q_value)
-            tf.print("Actor Training Loss: ", loss)
+            if self.debug_mode:
+                self.actor_loss_log = loss.numpy()
+            # tf.print("Actor Training Loss: ", loss)
         gradient = tape.gradient(loss, self.actor_model.trainable_variables)
         # for var, g in zip(self.actor_model.trainable_variables, gradient):
         #     # in this loop g is the gradient of each layer
@@ -255,15 +280,19 @@ class KerasTD3Tuple(exarl.ExaAgent):
         for (target_weight, weight) in zip(target_weights, weights):
             target_weight.assign(weight * self.tau + target_weight * (1.0 - self.tau))
 
-    def update_gradient(self, state_batch, action_batch, reward_batch, next_state_batch):
-        return False
-
     def update(self, state_batch, action_batch, reward_batch, next_state_batch):
         if self.ntrain_calls % self.actor_update_freq == 0:
             self.train_actor(state_batch)
         if self.ntrain_calls % self.critic_update_freq == 0:    
             self.train_critic(state_batch, action_batch, reward_batch, next_state_batch)
-        
+
+    def logging(self):
+        with open("./outputs/pend/" + run_name + "_" + "agent", "a") as myfile:
+            myfile.write(
+            str(self.actor_loss_log) + ' ' + 
+            str(self.critic1_loss_log) + ' ' +
+            str(self.critic2_loss_log) +
+            '\n')
 
     def _convert_to_tensor(self, state_batch, action_batch, reward_batch, next_state_batch, terminal_batch):
         tf_state_batch = np.zeros(shape=(self.batch_size,self.num_states))
@@ -285,6 +314,8 @@ class KerasTD3Tuple(exarl.ExaAgent):
         """ Method used to train """
         self.ntrain_calls += 1
         self.update(batch[0], batch[1], batch[2], batch[3])
+        if self.debug_mode:
+            self.logging()
 
     def update_target(self):
         if self.ntrain_calls % self.actor_update_freq == 0:
@@ -295,12 +326,10 @@ class KerasTD3Tuple(exarl.ExaAgent):
 
     def action(self, state):
         """ Method used to provide the next action using the target model """
-        print("State from tuple: ", state[0])
 
         tf_state = tf.expand_dims(tf.convert_to_tensor(state[0]), 0)
         
         test = self.actor_model(tf_state)
-        print("Output of network: ", test)
         sampled_actions = tf.squeeze(test)
         # noise = np.random.normal(0, 0.1, self.num_actions)
 
@@ -311,8 +340,10 @@ class KerasTD3Tuple(exarl.ExaAgent):
 
         # We make sure action is within bounds
         legal_action = np.clip(sampled_actions, self.lower_bound, self.upper_bound)
+
+        # Logging action
+        self.actions_log.append(np.squeeze(legal_action))
         # tf.print("legal_action", legal_action.shape)
-        print("Legal action: ", legal_action)
         # return [np.squeeze(legal_action)], [np.squeeze(noise)]
         return [np.squeeze(legal_action)], policy_type
 

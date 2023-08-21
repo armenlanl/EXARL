@@ -24,10 +24,17 @@ import numpy as np
 import sys
 import json
 import exarl as erl
+from datetime import datetime
 # from envs.env_vault.computePI import computePI as cp
 from exarl.base.comm_base import ExaComm
 from exarl.utils.introspect import introspectTrace
+from exarl.utils.globals import ExaGlobals
 
+run_name = str(ExaGlobals.lookup_params('experiment_id'))
+now = datetime.now()
+NAME = now.strftime("%d_%m_%Y_%H-%M-%S_")
+
+run_name = NAME + run_name
 
 def computePI(N, new_comm):
     h = 1.0 / N
@@ -78,6 +85,15 @@ class ExaPendulumTuple(gym.Env):
 
         # if self.env_comm.rank == 0:
         #     print(PI)  # Print PI for verification
+
+        with open("./outputs/pend/" + run_name + "_" + "env", "a") as myfile:
+            myfile.write(
+            str(action[0]) + ' ' + 
+            str(reward) + ' ' +
+            str(next_state[0]) + ' ' +
+            str(next_state[1]) + ' ' +
+            str(next_state[2]) +
+            '\n')
 
         print("Reward: ", reward)
 

@@ -206,7 +206,7 @@ class StateStatistics:
         except:
                 self.counts[finalState]=1
         if(finalState!=self.label):
-                self.nTransitions+=1
+                self.nTransitions+=11
 
 class ExaExaaltGraphRLCR(gym.Env):
 
@@ -484,14 +484,14 @@ class ExaExaaltGraphRLCR(gym.Env):
 
 
         if (self.WCT >= self.RUN_TIME):
-            # self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers) 
+            self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers) 
             done = True
 
         """ Iterates the testing process forward one step """
 
         # self.reward = 0.5*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + 0.5*(added/self.nWorkers)
         # self.reward = (added/self.nWorkers)
-        self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
+        # self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
         current_state = self.traj[-1]
         adj_mat, inc_keys = self.generate_data()
         np.put(self.adj_states, np.arange(len(inc_keys)), inc_keys)        

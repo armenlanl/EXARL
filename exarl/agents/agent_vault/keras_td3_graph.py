@@ -176,7 +176,6 @@ class KerasGraphTD3(exarl.ExaAgent):
         return model
 
     def get_actor(self):
-
         # MLP
         inputs = tf.keras.layers.Input(shape=self.num_states + (1,))
         #

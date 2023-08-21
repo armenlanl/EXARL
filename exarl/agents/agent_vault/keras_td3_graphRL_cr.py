@@ -77,7 +77,7 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
         self.buffer_counter = 0
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
         self.batch_size = ExaGlobals.lookup_params('batch_size')
-        self.horizon = 100
+        self.horizon = 10
         if self.horizon == 1:
             self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
         else:
@@ -116,9 +116,9 @@ class KerasGraphTD3RLCR(exarl.ExaAgent):
 
         # update counting
         self.ntrain_calls = 0
-        self.actor_update_freq = int(ExaGlobals.lookup_params('n_steps')/100)
-        self.target_critic_update_freq = int(ExaGlobals.lookup_params('n_steps')/100)
-        self.critic_update_freq = int(ExaGlobals.lookup_params('n_steps')/50)
+        self.actor_update_freq = int(ExaGlobals.lookup_params('n_steps'))
+        self.target_critic_update_freq = int(ExaGlobals.lookup_params('n_steps'))
+        self.critic_update_freq = int(ExaGlobals.lookup_params('n_steps'))
 
         # Ornstein-Uhlenbeck process
         std_dev = 0.2
