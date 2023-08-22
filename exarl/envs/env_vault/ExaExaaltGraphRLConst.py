@@ -491,7 +491,7 @@ class ExaExaaltGraphRLConst(gym.Env):
                 
         # self.reward =  ((self.RUN_TIME-self.WCT)/self.RUN_TIME)*(added/self.nWorkers)
         
-        self.reward = added/self.nWorkers
+        # self.reward = added/self.nWorkers
 
         if (self.WCT >= self.RUN_TIME):
             self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers) 
@@ -508,7 +508,7 @@ class ExaExaaltGraphRLConst(gym.Env):
         next_state = (adj_mat, current_state, self.knownStates)
 
         info = None
-        # if (rank == 1):
+        
         print("Step: ", self.WCT, " Reward: ", self.reward, " ", done, " Added: ", added)
         return next_state, self.reward, done, info
 

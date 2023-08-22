@@ -157,7 +157,7 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
             self.actions_log = []
 
     @tf.function
-    def train_critic(self, states, actions, rewards, next_states, masks, next_masks):
+    def train_critic(self, states, actions, rewards, next_states, dones, masks, next_masks):
         
         next_adj_mat, next_dat_mat = tf.split(next_states, num_or_size_splits=2, axis=2)
         next_actions = self.target_actor([next_adj_mat, next_dat_mat], training=False)
@@ -178,7 +178,7 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         new_q = tf.math.minimum(new_q1, new_q2)
 
         # Bellman equation for the q value
-        q_targets = rewards + self.gamma * new_q
+        q_targets = rewards + (1.0 - dones) * self.gamma * new_q
 
         actions = tf.where(masks, actions, tf.constant(-np.inf, shape=actions.shape))
         actions = tf.nn.softmax(actions)
@@ -239,18 +239,18 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
     def get_critic(self):
         # State as input
         adj_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        state_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(adj_inputs)
-        state_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(state_out)
-        state_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(state_out)
+        state_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(adj_inputs)
+        state_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(state_out)
+        state_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(state_out)
         state_out = tf.keras.layers.Flatten()(state_out)
         state_out = tf.keras.layers.Dense(256, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(128, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(64, activation="relu")(state_out)
 
         dat_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        dat_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(dat_inputs)
-        dat_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(dat_out)
+        dat_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(dat_inputs)
+        dat_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(dat_out)
+        dat_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Flatten()(dat_out)
         dat_out = tf.keras.layers.Dense(256, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(128, activation="relu")(dat_out)
@@ -310,18 +310,18 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         # State as input
 
         adj_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        state_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(adj_inputs)
-        state_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(state_out)
-        state_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(state_out)
+        state_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(adj_inputs)
+        state_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(state_out)
+        state_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(state_out)
         state_out = tf.keras.layers.Flatten()(state_out)
         state_out = tf.keras.layers.Dense(256, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(128, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(64, activation="relu")(state_out)
 
         dat_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        dat_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(dat_inputs)
-        dat_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(dat_out)
+        dat_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(dat_inputs)
+        dat_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(dat_out)
+        dat_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Flatten()(dat_out)
         dat_out = tf.keras.layers.Dense(256, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(128, activation="relu")(dat_out)
@@ -352,11 +352,11 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         for (target_weight, weight) in zip(target_weights, weights):
             target_weight.assign(weight * self.tau + target_weight * (1.0 - self.tau))
 
-    def update(self, state_batch, action_batch, reward_batch, next_state_batch, masks, next_masks):
+    def update(self, state_batch, action_batch, reward_batch, next_state_batch, done_batch, masks, next_masks):
         if self.ntrain_calls % self.actor_update_freq == 0:
             self.train_actor(state_batch, masks)
         if self.ntrain_calls % self.critic_update_freq == 0:
-            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch, masks, next_masks)
+            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch, done_batch, masks, next_masks)
     
     def logging(self):
         comm = MPI.COMM_WORLD
@@ -415,7 +415,7 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
     def train(self, batch):
         """ Method used to train """
         self.ntrain_calls += 1
-        self.update(batch[0], batch[1], batch[2], batch[3], batch[5], batch[6])
+        self.update(batch[0], batch[1], batch[2], batch[3], batch[4], batch[5], batch[6])
         if self.debug_mode and self.ntrain_calls % self.critic_update_freq == 0:
             self.logging()
 
