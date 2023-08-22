@@ -152,42 +152,24 @@ class nStepBuffer(Replay):
             next_state_batch (2D array): batch of next_states
             done_batch (array): batch of done
         """
-        record_range = min(len(self), self._memory_size)
-        # print("Record range: ", record_range)
-        record_range = max(1, record_range)
-        # print("Record range after: ", record_range)
-        record_range = self._memory_counter - 1
+        record_range = self._memory_counter
 
         # Randomly sample indices
-        batch_indices    = np.random.choice(self._memory_counter, batch_size)
-        # print("Batch indices: ", batch_indices, " state_buffer: ", (len(a) for a in self._state_buffer[0]))
+        batch_indices    = np.random.choice(record_range, batch_size)
         state_batch      = np.array(self._state_buffer, dtype=object)[batch_indices]
-        # print("State batch: ", state_batch)
         action_batch     = self._action_buffer[batch_indices]
-        # done_batch       = self._done_buffer[batch_indices]
-        # reward_batch     = self._reward_buffer[batch_indices]
-        # next_state_batch = self._next_state_buffer[batch_indices]
 
         reward_batch   = []
         next_state_ind = []
         done_batch     = []
         for b_start in batch_indices:
-            b_end     = np.min([record_range, b_start + self._horizon - 1])
-            # print("B_end: ", b_end)
-            done_ind  = np.where(self._done_buffer[b_start:b_end])[0]
-            # print("Doneind: ", done_ind)
+            b_end     = np.min([record_range - 1, b_start + self._horizon - 1])
+            done_ind  = np.where(self._done_buffer[b_start:b_end+1])[0]
             b_end     = b_end if len(done_ind) == 0 else b_start + done_ind[0]
-            # print("B_end: ", b_end)
-            reward_batch.append( np.sum(self._reward_buffer[b_start:b_end] * self._gamma**np.arange(b_end - b_start + 1)) )
-            # next_state_ind.append( b_end + 1 if b_end != record_range else record_range)
+            reward_batch.append( np.sum(self._reward_buffer[b_start:b_end+1] * self._gamma**np.arange(b_end - b_start + 1)) )
             next_state_ind.append(b_end)
             done_batch.append( 0 if len(done_ind) == 0 else 1)
-        # print("Next state indices: ", next_state_ind, " length of next_state_buffer: ", len(self._next_state_buffer))
-        # print(self._next_state_buffer)
-        next_state_batch      = np.array(self._next_state_buffer, dtype=object)[batch_indices]
-        # next_state_batch = [self._next_state_buffer[ind] for ind in next_state_ind]
-        # next_state_batch = np.array(next_state_batch, dtyp)
- 
+        next_state_batch      = np.array(self._next_state_buffer, dtype=object)[batch_indices] 
 
         return state_batch, action_batch, reward_batch, next_state_batch, done_batch
 

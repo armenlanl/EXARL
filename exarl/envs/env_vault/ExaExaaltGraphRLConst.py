@@ -21,6 +21,7 @@
 
 import numpy  as np
 import gym
+import os
 from mpi4py import MPI
 from exarl.utils.globals import ExaGlobals
 from datetime import datetime
@@ -457,8 +458,14 @@ class ExaExaaltGraphRLConst(gym.Env):
             #             '\n')
         added = 0
         self.WCT+=1
+        action_str = [str(x) for x in action]
+        action_str = " ".join(action_str)
         taskList = list(taskList)
         # print("Untouched tasklist: ", taskList)
+
+        if not os.path.exists("./outputs/Exaalt/" + run_name + "/"):
+            os.makedirs("./outputs/Exaalt/" + run_name + "/")
+
         while(True):
             current_state=self.traj[-1]
             next_state = None
@@ -467,13 +474,14 @@ class ExaExaaltGraphRLConst(gym.Env):
                 # print("Next state: ", next_state)
                 self.traj.append(next_state)
             except:
-                with open("./outputs/" + run_name + "_" + str(rank), "a") as myfile:
+                with open("./outputs/Exaalt/" + run_name + "/" + run_name + "_" + str(rank), "a") as myfile:
                         myfile.write(
                         str(round(self.WCT,3))+' '+
                         str(len(self.traj))+' '+
                         str(self.WCT*self.nWorkers)+' '+
                         str((len(self.traj)-1)/float(self.WCT*self.nWorkers))+' '+
                         str(added)+' '+
+                        action_str + ' ' +
                         '\n')
                 break
             if (next_state in taskList):
@@ -481,7 +489,9 @@ class ExaExaaltGraphRLConst(gym.Env):
                 taskList.remove(next_state)
                 # print("Modified tasklist: ", taskList)
                 
-
+        # self.reward =  ((self.RUN_TIME-self.WCT)/self.RUN_TIME)*(added/self.nWorkers)
+        
+        self.reward = added/self.nWorkers
 
         if (self.WCT >= self.RUN_TIME):
             self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers) 

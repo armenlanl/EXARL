@@ -27,6 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 import numpy as np
 import tensorflow as tf
+import os
+from mpi4py import MPI
 from datetime import datetime
 # import tensorflow_probability as tfp
 from tensorflow.keras.initializers import RandomUniform
@@ -79,7 +81,7 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         self.buffer_counter = 0
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
         self.batch_size = ExaGlobals.lookup_params('batch_size')
-        self.horizon = 100
+        self.horizon = 10
         if self.horizon == 1:
             self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
         else:
@@ -359,7 +361,11 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
     def logging(self):
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
-        with open("./outputs/Exaalt/" + run_name + "_" + "agent_" + str(rank), "a") as myfile:
+
+        if not os.path.exists("./outputs/Exaalt/" + run_name + "/"):
+            os.makedirs("./outputs/Exaalt/" + run_name + "/")
+
+        with open("./outputs/Exaalt/" + run_name + "/" + run_name + "_" + "agent_" + str(rank), "a") as myfile:
             myfile.write(
             str(self.actor_loss_log) + ' ' + 
             str(self.critic1_loss_log) + ' ' +
