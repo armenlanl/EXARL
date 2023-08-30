@@ -32,7 +32,7 @@ from datetime import datetime
 try:
     graph_size = ExaGlobals.lookup_params('graph_size')
 except:
-    graph_size = 20
+    graph_size = 2
 
 # NAME = np.random.randint(99999)
 
@@ -493,14 +493,14 @@ class ExaExaaltGraphRLConst(gym.Env):
         
         # self.reward = added/self.nWorkers
 
-        if (self.WCT >= self.RUN_TIME):
-            self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers) 
-            done = True
+        # if (self.WCT >= self.RUN_TIME):
+        #     self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers) 
+        #     done = True
 
         """ Iterates the testing process forward one step """
 
         # self.reward = 0.5*(len(self.traj)-1)/float(self.WCT*self.nWorkers) + 0.5*(added/self.nWorkers)
-        # self.reward = (added/self.nWorkers)
+        self.reward = action[1]
         # self.reward = (len(self.traj)-1)/float(self.WCT*self.nWorkers)
         current_state = self.traj[-1]
         adj_mat, inc_keys = self.generate_data()
@@ -527,7 +527,7 @@ class ExaExaaltGraphRLConst(gym.Env):
         self.knownStates                     = {}
         self.database[self.INITIAL_STATE]    = []
         self.traj.append(self.INITIAL_STATE)
-        self.adj_states = np.zeros(20, dtype=int)
+        self.adj_states = np.zeros(self.graph_len, dtype=int)
         self.adj_states[0] = self.INITIAL_STATE      
 
         for i in range(self.n_states):

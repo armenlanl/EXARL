@@ -48,11 +48,6 @@ NAME = now.strftime("%d_%m_%Y_%H-%M-%S_")
 
 run_name = NAME + run_name
 
-try:
-    graph_size = ExaGlobals.lookup_params('graph_size')
-except:
-    graph_size = 20
-
 def softmax(x):
     return(np.exp(x)/np.exp(x).sum())
 
@@ -81,7 +76,7 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         self.buffer_counter = 0
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
         self.batch_size = ExaGlobals.lookup_params('batch_size')
-        self.horizon = 10
+        self.horizon = 1
         if self.horizon == 1:
             self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
         else:
@@ -126,9 +121,9 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
 
         # update counting
         self.ntrain_calls = 0
-        self.actor_update_freq = int(ExaGlobals.lookup_params('n_steps'))
-        self.target_critic_update_freq = int(ExaGlobals.lookup_params('n_steps'))
-        self.critic_update_freq = int(ExaGlobals.lookup_params('n_steps'))
+        self.actor_update_freq = int(ExaGlobals.lookup_params('n_steps')/50)
+        self.target_critic_update_freq = int(ExaGlobals.lookup_params('n_steps')/50)
+        self.critic_update_freq = int(ExaGlobals.lookup_params('n_steps')/100)
 
         # Ornstein-Uhlenbeck process
         std_dev = 0.2
@@ -139,6 +134,11 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         self.epsilon = ExaGlobals.lookup_params('epsilon')
         self.epsilon_min = ExaGlobals.lookup_params('epsilon_min')
         self.epsilon_decay = ExaGlobals.lookup_params('epsilon_decay')
+        
+        self.noise = ExaGlobals.lookup_params('noise')
+        self.noise_min = ExaGlobals.lookup_params('noise_min')
+        self.noise_decay = ExaGlobals.lookup_params('noise_decay')
+        print("Epsilon: ", self.epsilon, " min: ", self.epsilon_min, " decay: ", self.epsilon_decay)
 
         logger().info("TD3 buffer capacity {}".format(self.buffer_capacity))
         logger().info("TD3 batch size {}".format(self.batch_size))
@@ -163,11 +163,12 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         next_actions = self.target_actor([next_adj_mat, next_dat_mat], training=False)
         
         # Add a little noise
-        noise = self.ou_noise()
-        next_actions = next_actions + noise
-        # noise = np.random.normal(0, 0.1, self.node_count)
-        # noise = np.clip(noise, -0.5, 0.5)
-        # next_actions = next_actions * (1 + noise)
+        # noise = self.ou_noise()
+        # next_actions = next_actions + noise
+        noise = np.random.normal(0, self.noise, self.num_actions)
+        noise = np.clip(noise, -0.5, 0.5)
+        next_actions = next_actions * (1 + noise)
+        self.noise = max((self.noise*self.noise_decay), self.noise_min)
        
         #Masking the invalid actions
         next_actions = tf.where(next_masks, next_actions, tf.constant(-np.inf, shape=next_actions.shape))
@@ -239,22 +240,22 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
     def get_critic(self):
         # State as input
         adj_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        state_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(adj_inputs)
-        state_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(state_out)
-        state_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(state_out)
-        state_out = tf.keras.layers.Flatten()(state_out)
+        # state_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(adj_inputs)
+        # state_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(state_out)
+        # state_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(state_out)
+        state_out = tf.keras.layers.Flatten()(adj_inputs)
+        state_out = tf.keras.layers.Dense(512, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(256, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(128, activation="relu")(state_out)
-        state_out = tf.keras.layers.Dense(64, activation="relu")(state_out)
 
         dat_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        dat_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(dat_inputs)
-        dat_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Flatten()(dat_out)
+        # dat_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(dat_inputs)
+        # dat_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(dat_out)
+        # dat_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(dat_out)
+        dat_out = tf.keras.layers.Flatten()(dat_inputs)
+        dat_out = tf.keras.layers.Dense(512, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(256, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(128, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Dense(64, activation="relu")(dat_out)
 
 
         state_out = tf.keras.layers.Concatenate()([state_out,dat_out])
@@ -310,22 +311,22 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         # State as input
 
         adj_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        state_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(adj_inputs)
-        state_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(state_out)
-        state_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(state_out)
-        state_out = tf.keras.layers.Flatten()(state_out)
+        # state_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(adj_inputs)
+        # state_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(state_out)
+        # state_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(state_out)
+        state_out = tf.keras.layers.Flatten()(adj_inputs)
+        state_out = tf.keras.layers.Dense(512, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(256, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(128, activation="relu")(state_out)
-        state_out = tf.keras.layers.Dense(64, activation="relu")(state_out)
 
         dat_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        dat_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(dat_inputs)
-        dat_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Flatten()(dat_out)
+        # dat_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(dat_inputs)
+        # dat_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(dat_out)
+        # dat_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(dat_out)
+        dat_out = tf.keras.layers.Flatten()(dat_inputs)
+        dat_out = tf.keras.layers.Dense(512, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(256, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(128, activation="relu")(dat_out)
-        dat_out = tf.keras.layers.Dense(64, activation="relu")(dat_out)
 
         concat = tf.keras.layers.Concatenate()([state_out, dat_out])
 
@@ -445,30 +446,26 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         # create the tensor from the adj matrix and get the action size number of nodes in graph
         tf_state = tf.expand_dims(tf.convert_to_tensor(state[0]), 0)
         adj_mat, dat_mat = tf.split(tf_state, num_or_size_splits=2, axis=2)
-        # print("Adj matrix: ", adj_mat)
-        # print("Dat matrix: ", dat_mat)
-
-        raw_output = self.actor_model([adj_mat,dat_mat])
-        # print("raw_output: ", raw_output)
-        sampled_actions = tf.squeeze(raw_output)
         
-        # add noise to the sampled actions
-        noise = self.ou_noise()
-        sampled_actions = sampled_actions.numpy() + noise
+        raw_output = self.actor_model([adj_mat,dat_mat])
+        sampled_actions = tf.squeeze(raw_output)
+
+        # print("Sampled actions: ", sampled_actions)
+        
+        # print("Amount of noise: ", self.noise)
+        noise = np.random.normal(0, self.noise, self.num_actions)
+
+        sampled_actions = sampled_actions.numpy() * (1 + noise)
+
+        # print("Sampled actions noise: ", sampled_actions)
+
         if (len(known_keys) < self.num_actions):
             np.put(sampled_actions, np.arange(len(known_keys), self.num_actions), -np.inf*np.ones(int(self.num_actions-len(known_keys))))
-        # print("After: ", sampled_actions)
-        # mask_indices = np.array(known_keys)
-        # mask = np.zeros(self.node_count, dtype=int)
-        # mask[mask_indices] = 1
-        # sampled_actions_masked = sampled_actions*mask
-
-        # Mask all zerod out values to very large negative value
-        # for x in range(self.node_count):
-        #     if sampled_actions_masked[x] == 0:
-        #         sampled_actions_masked[x] = float('-inf')
 
         sampled_actions_probs = softmax(sampled_actions)
+
+        # print("Sampled actions probs: ", sampled_actions_probs)
+
 
         return sampled_actions_probs, policy_type
 

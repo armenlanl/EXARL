@@ -661,6 +661,7 @@ class SYNC(exarl.ExaWorkflow):
         # Repeat steps 3-9 for a number of episodes
         for eps in range(self.batch_episode_frequency):
             # Set the episode for envs that want to keep track
+            print("Episode: ", str(episode+eps))
             exalearner.env.set_episode_count(episode + eps)
 
             # Reset environment if required (3)
@@ -670,16 +671,21 @@ class SYNC(exarl.ExaWorkflow):
             for i in range(self.batch_step_frequency):
                 # Do inference (4)
                 if ExaComm.env_comm.rank == 0:
+                    print("Current State Shape: ", self.current_state[0].shape)
                     action, policy_type = exalearner.agent.action(self.current_state)
+                    print("Action: ", action)
                     if exalearner.action_type == "fixed":
                         action, policy_type = 0, -11
 
                 # Set the step for envs that want to keep track
+                print("Step count: ", self.steps)
                 exalearner.env.set_step_count(self.steps)
 
                 # Broadcast action and do step (5 and 6)
                 action = ExaComm.env_comm.bcast(action, root=0)
                 next_state, reward, self.done, _ = exalearner.env.step(action)
+                print("Next state Shape: ", next_state[0].shape)
+                print("Reward: ", reward, " Done: ", self.done)
                 self.steps += 1
 
                 # Clip rewards if specified in configuration
@@ -690,6 +696,7 @@ class SYNC(exarl.ExaWorkflow):
                 if ExaComm.env_comm.rank == 0:
                     exalearner.agent.remember(self.current_state, action, reward, next_state, self.done)
                     self.total_reward += reward
+                    print("Total reward: ", self.total_reward)
 
                 # Check number of steps and broadcast (8)
                 if self.steps == exalearner.nsteps:
@@ -762,7 +769,6 @@ class SYNC(exarl.ExaWorkflow):
         self.init_learner(exalearner)
         if ExaComm.is_agent():
             while self.alive and self.done_episode < nepisodes:
-                print("EPISODE NUMBER: ", self.done_episode)
                 self.actor(exalearner, nepisodes)
                 do_convergence_check = self.learner(exalearner, nepisodes, 0)
                 if do_convergence_check:

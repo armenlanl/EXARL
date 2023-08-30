@@ -56,6 +56,11 @@ class ExaPendulumTuple(gym.Env):
         self.env = gym.make('Pendulum-v1', g=9.81)
         self.action_space = self.env.action_space
         
+        self.WCT = 0
+        self.reward = 0
+        self.reward_cum = 0
+        self.RUN_TIME  = int(ExaGlobals.lookup_params('n_steps'))
+        
         # Defining tuple state space
         self.mask = gym.spaces.Dict({})
         self.end_traj = gym.spaces.Discrete(1)
@@ -69,6 +74,7 @@ class ExaPendulumTuple(gym.Env):
 
     @introspectTrace()
     def step(self, action):
+        self.WCT+=1
         next_state, reward, done, _, info = self.env.step(action)
         time.sleep(0)  # Delay in seconds
 
@@ -94,16 +100,23 @@ class ExaPendulumTuple(gym.Env):
             str(next_state[1]) + ' ' +
             str(next_state[2]) +
             '\n')
-
-        print("Reward: ", reward)
+        # self.reward_cum += reward
+        # if (self.WCT >= self.RUN_TIME or done == 1):
+        #     self.reward = self.reward_cum 
+        #     done = True
+        self.reward = reward
+        # print("Reward: ", self.reward)
 
         next_tuple_state = (next_state, self.end_traj, self.mask)
 
-        return next_tuple_state, reward, done, info
+        return next_tuple_state, self.reward, done, info
 
     def reset(self):
         # self.env._max_episode_steps=self._max_episode_steps
         # print('Max steps: %s' % str(self._max_episode_steps))
+        self.reward = 0
+        self.reward_cum = 0
+        self.WCT = 0
         default_reset = self.env.reset()
         state_tuple = (default_reset[0], self.end_traj, self.mask)
         return state_tuple, {}

@@ -170,7 +170,7 @@ class nStepBuffer(Replay):
             next_state_ind.append(b_end)
             done_batch.append( 0 if len(done_ind) == 0 else 1)
         next_state_batch      = np.array(self._next_state_buffer, dtype=object)[batch_indices] 
-
+        reward_batch          = np.array(reward_batch)[:,None]
         return state_batch, action_batch, reward_batch, next_state_batch, done_batch
 
     def reset_memory(self):

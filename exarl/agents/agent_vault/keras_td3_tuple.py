@@ -36,6 +36,7 @@ import exarl
 from exarl.utils.globals import ExaGlobals
 from exarl.utils.OUActionNoise import OUActionNoise
 from exarl.agents.agent_vault._replay_buffer import ReplayBuffer
+from exarl.agents.agent_vault._replay_buffer import nStepBuffer
 logger = ExaGlobals.setup_logger(__name__)
 
 run_name = str(ExaGlobals.lookup_params('experiment_id'))
@@ -61,17 +62,20 @@ class KerasTD3Tuple(exarl.ExaAgent):
         # print('upper_bound: ', self.upper_bound)
         # print('lower_bound: ', self.lower_bound)
 
+        # Used to update target networks
+        self.tau = ExaGlobals.lookup_params('tau')
+        self.gamma = ExaGlobals.lookup_params('gamma')
+
         # Buffer
         self.buffer_counter = 0
         self.buffer_capacity = ExaGlobals.lookup_params('buffer_capacity')
         self.batch_size = ExaGlobals.lookup_params('batch_size')
-        self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
+        self.horizon = 10
+        if self.horizon == 1:
+            self.memory = ReplayBuffer(self.buffer_capacity, self.num_states, self.num_actions)
+        else:
+            self.memory = nStepBuffer(self.buffer_capacity, self.num_states, self.num_actions, self.horizon, self.gamma)
         self.per_buffer = np.ones((self.buffer_capacity, 1))
-        # self.state_buffer = np.zeros((self.buffer_capacity, self.num_states))
-        # self.action_buffer = np.zeros((self.buffer_capacity, self.num_actions))
-        # self.reward_buffer = np.zeros((self.buffer_capacity, 1))
-        # self.next_state_buffer = np.zeros((self.buffer_capacity, self.num_states))
-        # self.done_buffer = np.zeros((self.buffer_capacity, 1))
 
         # Model Definitions
         self.actor_dense = ExaGlobals.lookup_params('actor_dense')
@@ -91,10 +95,6 @@ class KerasTD3Tuple(exarl.ExaAgent):
         std_dev = 0.2
         ave_bound = np.zeros(1)
         self.ou_noise = OUActionNoise(mean=ave_bound, std_deviation=float(std_dev) * np.ones(1))
-
-        # Used to update target networks
-        self.tau = ExaGlobals.lookup_params('tau')
-        self.gamma = ExaGlobals.lookup_params('gamma')
 
         # Setup Optimizers
         critic_lr = ExaGlobals.lookup_params('critic_lr')
@@ -151,7 +151,7 @@ class KerasTD3Tuple(exarl.ExaAgent):
 
 
     @tf.function
-    def train_critic(self, states, actions, rewards, next_states):
+    def train_critic(self, states, actions, rewards, next_states, dones):
         next_actions = self.target_actor(next_states, training=True)
         # Add a little noise
         # noise = np.random.normal(0, 0.2, self.num_actions)
@@ -161,7 +161,7 @@ class KerasTD3Tuple(exarl.ExaAgent):
         new_q2 = self.target_critic2([next_states, next_actions], training=True)
         new_q = tf.math.minimum(new_q1, new_q2)
         # Bellman equation for the q value
-        q_targets = rewards + self.gamma * new_q
+        q_targets = rewards + (1 - dones) * self.gamma * new_q
         # Critic 1
         with tf.GradientTape() as tape:
             q_values1 = self.critic_model1([states, actions], training=True)
@@ -280,11 +280,11 @@ class KerasTD3Tuple(exarl.ExaAgent):
         for (target_weight, weight) in zip(target_weights, weights):
             target_weight.assign(weight * self.tau + target_weight * (1.0 - self.tau))
 
-    def update(self, state_batch, action_batch, reward_batch, next_state_batch):
+    def update(self, state_batch, action_batch, reward_batch, next_state_batch, done_batch):
         if self.ntrain_calls % self.actor_update_freq == 0:
             self.train_actor(state_batch)
         if self.ntrain_calls % self.critic_update_freq == 0:    
-            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch)
+            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch, done_batch)
 
     def logging(self):
         with open("./outputs/pend/" + run_name + "_" + "agent", "a") as myfile:
@@ -313,7 +313,7 @@ class KerasTD3Tuple(exarl.ExaAgent):
     def train(self, batch):
         """ Method used to train """
         self.ntrain_calls += 1
-        self.update(batch[0], batch[1], batch[2], batch[3])
+        self.update(batch[0], batch[1], batch[2], batch[3], batch[4])
         if self.debug_mode:
             self.logging()
 
