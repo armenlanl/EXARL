@@ -813,4 +813,6 @@ class SYNC(exarl.ExaWorkflow):
         int :
             Average reward of the rolling_reward_length number of episodes.
         """
+        print(np.array(self.episode_reward_list[-self.rolling_reward_length:]))
+        print(np.mean(np.array(self.episode_reward_list[-self.rolling_reward_length:])))
         return np.mean(np.array(self.episode_reward_list[-self.rolling_reward_length:])), self.rolling_reward_length

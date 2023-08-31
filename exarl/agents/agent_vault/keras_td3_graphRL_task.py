@@ -36,10 +36,11 @@ from exarl.utils.globals import ExaGlobals
 from exarl.agents.agent_vault._replay_buffer import ReplayBuffer
 logger = ExaGlobals.setup_logger(__name__)
 
-try:
-    graph_size = ExaGlobals.lookup_params('graph_size')
-except:
-    graph_size = 20
+run_name = str(ExaGlobals.lookup_params('experiment_id'))
+now = datetime.now()
+NAME = now.strftime("%d_%m_%Y_%H-%M-%S_")
+
+run_name = NAME + run_name
 
 def softmax(x):
     return(np.exp(x)/np.exp(x).sum())
@@ -126,14 +127,14 @@ class KerasGraphTD3RLTask(exarl.ExaAgent):
         logger().info("TD3 actor_lr {}".format(actor_lr))
 
     @tf.function
-    def train_critic(self, states, actions, rewards, next_states, masks, next_masks):
+    def train_critic(self, states, actions, rewards, next_states, dones, masks, next_masks):
         next_actions = self.target_actor(next_states, training=False)
 
         #Masking the invalid actions
         next_actions = tf.where(next_masks, next_actions, tf.constant(-np.inf, shape=next_actions.shape))
 
         #Add a little noise
-        noise = np.random.normal(0, 0.1, self.node_count)
+        noise = np.random.normal(0, 0.2, self.node_count)
         noise = np.clip(noise, -0.5, 0.5)
         next_actions = next_actions * (1 + noise)
         
@@ -144,7 +145,7 @@ class KerasGraphTD3RLTask(exarl.ExaAgent):
         new_q2 = self.target_critic2([next_states, next_actions], training=False)
         new_q = tf.math.minimum(new_q1, new_q2)
         # Bellman equation for the q value
-        q_targets = rewards + self.gamma * new_q
+        q_targets = rewards + (1.0 - dones) * self.gamma * new_q
 
         actions = tf.where(masks, actions, tf.constant(-np.inf, shape=actions.shape))
         actions = tf.nn.softmax(actions)
@@ -267,11 +268,11 @@ class KerasGraphTD3RLTask(exarl.ExaAgent):
         for (target_weight, weight) in zip(target_weights, weights):
             target_weight.assign(weight * self.tau + target_weight * (1.0 - self.tau))
 
-    def update(self, state_batch, action_batch, reward_batch, next_state_batch, masks, next_masks):
+    def update(self, state_batch, action_batch, reward_batch, next_state_batch, done_batch, masks, next_masks):
         if self.ntrain_calls % self.actor_update_freq == 0:
             self.train_actor(state_batch, masks)
         if self.ntrain_calls % self.critic_update_freq == 0:
-            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch, masks, next_masks)
+            self.train_critic(state_batch, action_batch, reward_batch, next_state_batch, done_batch, masks, next_masks)
         
     def _convert_to_tensor(self, state_batch, action_batch, reward_batch, next_state_batch, terminal_batch):
         masks = []
@@ -312,7 +313,7 @@ class KerasGraphTD3RLTask(exarl.ExaAgent):
     def train(self, batch):
         """ Method used to train """
         self.ntrain_calls += 1
-        self.update(batch[0], batch[1], batch[2], batch[3], batch[5], batch[6])
+        self.update(batch[0], batch[1], batch[2], batch[3], batch[4], batch[5], batch[6])
 
     def update_target(self):
         if self.ntrain_calls % self.actor_update_freq == 0:

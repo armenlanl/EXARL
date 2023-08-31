@@ -253,7 +253,7 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         # dat_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(dat_out)
         # dat_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Flatten()(dat_inputs)
-        dat_out = tf.keras.layers.Dense(512, activation="relu")(dat_out)
+        # dat_out = tf.keras.layers.Dense(512, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(256, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(128, activation="relu")(dat_out)
 
@@ -311,20 +311,20 @@ class KerasGraphTD3RLConst(exarl.ExaAgent):
         # State as input
 
         adj_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        # state_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(adj_inputs)
-        # state_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(state_out)
-        # state_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(state_out)
+        # state_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(adj_inputs)
+        # state_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(state_out)
+        # state_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(state_out)
         state_out = tf.keras.layers.Flatten()(adj_inputs)
-        state_out = tf.keras.layers.Dense(512, activation="relu")(state_out)
+        # state_out = tf.keras.layers.Dense(512, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(256, activation="relu")(state_out)
         state_out = tf.keras.layers.Dense(128, activation="relu")(state_out)
 
         dat_inputs = tf.keras.layers.Input(shape=self.adj_shape + (1,))
-        # dat_out = tf.keras.layers.Conv2D(32, kernel_size=5, activation="relu")(dat_inputs)
-        # dat_out = tf.keras.layers.Conv2D(16, kernel_size=5, activation="relu")(dat_out)
-        # dat_out = tf.keras.layers.Conv2D(4, kernel_size=5, activation="relu")(dat_out)
+        # dat_out = tf.keras.layers.Conv2D(32, kernel_size=3, activation="relu")(dat_inputs)
+        # dat_out = tf.keras.layers.Conv2D(16, kernel_size=3, activation="relu")(dat_out)
+        # dat_out = tf.keras.layers.Conv2D(4, kernel_size=3, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Flatten()(dat_inputs)
-        dat_out = tf.keras.layers.Dense(512, activation="relu")(dat_out)
+        # dat_out = tf.keras.layers.Dense(512, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(256, activation="relu")(dat_out)
         dat_out = tf.keras.layers.Dense(128, activation="relu")(dat_out)
 
